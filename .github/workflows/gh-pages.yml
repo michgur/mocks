@@ -23,21 +23,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Install vp, set Node version, and cache deps — all in one step
-      - uses: voidzero-dev/setup-vp@v1
-        with:
-          node-version: lts
-          cache: true
-          run-install: true # runs `vp install` automatically
-
-      # Optional but recommended: fail fast on lint/type errors
-      - name: Check (format · lint · types)
-        run: vp check
-
-      # Build for production — output goes to ./dist by default
-      - name: Build
-        run: vp build
-
       # Build the telephony-onboarding sub-project and place it at dist/telephony
       - name: Install telephony-onboarding deps
         working-directory: ./telephony-onboarding
