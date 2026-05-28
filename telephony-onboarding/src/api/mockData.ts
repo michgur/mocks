@@ -11,8 +11,25 @@ export const seedAgents: Agent[] = [
   { id: 'agent_support', name: 'Support Agent' },
 ]
 
-// Start with no pools — the wizard creates the first one.
-export const seedPools: Pool[] = []
+// Seed includes a pool for Acme Inc so the Numbers page has content out of the gate.
+// The wizard's "create first pool" logic only fires when no pool exists for the entity,
+// so this doesn't conflict with the onboarding flow.
+export const seedPools: Pool[] = [
+  {
+    id: 'pool_acme_default',
+    legalEntityId: 'ent_acme',
+    name: 'My First Pool',
+    composition: [
+      { country: 'US', region: 'California', count: 4 },
+      { country: 'US', region: 'New York', count: 3 },
+    ],
+    inboundAgentId: 'agent_sales',
+    outboundAgentIds: ['agent_sales', 'agent_support'],
+    autoRotation: false,
+    createdAt: '2026-04-20T10:00:00Z',
+    updatedAt: '2026-04-20T10:00:00Z',
+  },
+]
 
 // Demo seed - exercises every status type from the PRD's dashboard mock.
 export const seedCapabilities: Capability[] = [

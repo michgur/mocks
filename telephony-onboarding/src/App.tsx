@@ -7,13 +7,13 @@ import { EntityProvider } from './state/EntityContext'
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
       <EntityProvider>
         <Routes>
           <Route element={<Layout />}>
             <Route path="/" element={<Navigate to="/numbers" replace />} />
             <Route path="/numbers" element={<NumbersPage />} />
-            <Route path="/registration" element={<DashboardPage />} />
+            <Route path="/business-registration" element={<DashboardPage />} />
           </Route>
           <Route path="/wizard" element={<WizardPage />} />
           <Route path="/wizard/:capabilityId" element={<WizardPage />} />

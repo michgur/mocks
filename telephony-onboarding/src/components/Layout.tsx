@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
   { to: '/numbers', label: 'Numbers' },
-  { to: '/registration', label: 'Business registration' },
+  { to: '/business-registration', label: 'Business registration' },
 ]
 
 export function Layout() {

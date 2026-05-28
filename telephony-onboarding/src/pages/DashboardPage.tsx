@@ -63,7 +63,7 @@ export function DashboardPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Business registration</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Carrier and regulatory registrations for this legal entity.
+            Your registered business and the capabilities it's been approved for.
           </p>
         </div>
         <EntitySwitcher />
@@ -72,7 +72,7 @@ export function DashboardPage() {
       <Card className="overflow-hidden">
         <div className="flex items-center justify-between border-b px-5 py-4">
           <div>
-            <div className="font-medium">Registrations</div>
+            <div className="font-medium">Capabilities</div>
             <div className="mt-0.5 text-sm text-muted-foreground">
               {approved} of {total} approved
               {inReview > 0 && ` · ${inReview} in review`}
@@ -80,9 +80,9 @@ export function DashboardPage() {
             </div>
           </div>
           <Button asChild>
-            <Link to="/wizard">
+            <Link to="/wizard?mode=capability">
               <Plus className="h-4 w-4" />
-              Add registration
+              Add capability
             </Link>
           </Button>
         </div>

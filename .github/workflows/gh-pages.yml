@@ -1,0 +1,72 @@
+name: Build & Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  # Allow manual runs from the Actions tab
+  workflow_dispatch:
+
+# Grant the GITHUB_TOKEN permission to deploy to Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one deployment at a time; cancel in-flight runs on new push
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Install vp, set Node version, and cache deps — all in one step
+      - uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version: lts
+          cache: true
+          run-install: true # runs `vp install` automatically
+
+      # Optional but recommended: fail fast on lint/type errors
+      - name: Check (format · lint · types)
+        run: vp check
+
+      # Build for production — output goes to ./dist by default
+      - name: Build
+        run: vp build
+
+      # Build the telephony-onboarding sub-project and place it at dist/telephony
+      - name: Install telephony-onboarding deps
+        working-directory: ./telephony-onboarding
+        run: npm ci
+
+      - name: Build telephony-onboarding
+        working-directory: ./telephony-onboarding
+        run: |
+          npx tsc -b
+          npx vite build --base=/telephony/
+
+      - name: Copy telephony-onboarding into Pages root
+        run: |
+          mkdir -p dist/telephony
+          cp -r telephony-onboarding/dist/. dist/telephony/
+
+      # Upload dist/ as a Pages artifact
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v5

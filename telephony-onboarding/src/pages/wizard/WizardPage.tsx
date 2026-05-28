@@ -15,6 +15,7 @@ import {
   type WizardStepId,
 } from './wizardState'
 import { RequirementsStep } from './steps/RequirementsStep'
+import { RequirementsCapabilityStep } from './steps/RequirementsCapabilityStep'
 import { BusinessInfoStep } from './steps/BusinessInfoStep'
 import { AuthorizedRepStep } from './steps/AuthorizedRepStep'
 import { MessagingStep } from './steps/MessagingStep'
@@ -27,6 +28,8 @@ export function WizardPage() {
   const [searchParams] = useSearchParams()
   const addType = searchParams.get('add') as CapabilityType | null
   const newEntity = searchParams.get('new_entity') === '1'
+  // mode=capability means we entered from "Add capability" — skip composition / pool creation.
+  const capabilityMode = searchParams.get('mode') === 'capability'
   const { currentEntity, setCurrentEntityId } = useEntityContext()
 
   const [state, setState] = useState<WizardFormState>(emptyWizardState)
@@ -91,7 +94,7 @@ export function WizardPage() {
 
   const onCancel = async () => {
     // For new wizards we could persist a draft; for now just navigate home.
-    navigate('/')
+    navigate('/business-registration')
   }
 
   const onBack = () => {
@@ -107,7 +110,7 @@ export function WizardPage() {
       setSubmitting(true)
       await submit()
       setSubmitting(false)
-      navigate('/')
+      navigate('/business-registration')
       return
     }
     setCurrentStep(steps[currentIndex + 1])
@@ -183,20 +186,22 @@ export function WizardPage() {
       ids[t] = created.id
     }
 
-    // Create the first pool for this entity if none exists yet. Defaults are
-    // intentionally light — inbound goes to the first agent, outbound covers all,
-    // auto-rotation off. All editable from the Numbers page.
-    const existingPools = await api.listPools(entityId)
-    if (existingPools.length === 0 && state.composition.length > 0) {
-      const agents = await api.listAgents()
-      await api.createPool({
-        legalEntityId: entityId,
-        name: 'My First Pool',
-        composition: state.composition,
-        inboundAgentId: agents[0]?.id ?? null,
-        outboundAgentIds: agents.map((a) => a.id),
-        autoRotation: false,
-      })
+    // Create the first pool for this entity if none exists yet, but only when we
+    // came in through the full setup flow. Capability-mode entries (Add capability)
+    // skip this — the user already has numbers and isn't ordering more.
+    if (!capabilityMode) {
+      const existingPools = await api.listPools(entityId)
+      if (existingPools.length === 0 && state.composition.length > 0) {
+        const agents = await api.listAgents()
+        await api.createPool({
+          legalEntityId: entityId,
+          name: 'My First Pool',
+          composition: state.composition,
+          inboundAgentId: agents[0]?.id ?? null,
+          outboundAgentIds: agents.map((a) => a.id),
+          autoRotation: false,
+        })
+      }
     }
   }
 
@@ -258,7 +263,12 @@ export function WizardPage() {
       nextDisabled={nextDisabled}
       onInsertMockData={insertMockData}
     >
-      {currentStep === 'requirements' && <RequirementsStep state={state} update={update} />}
+      {currentStep === 'requirements' &&
+        (capabilityMode ? (
+          <RequirementsCapabilityStep state={state} update={update} />
+        ) : (
+          <RequirementsStep state={state} update={update} />
+        ))}
       {currentStep === 'business' && (
         <BusinessInfoStep
           state={state}

@@ -42,9 +42,9 @@ export function EntitySwitcher() {
 
       {open && (
         <div className="absolute right-0 z-50 mt-1 w-72 rounded-md border bg-popover p-1 shadow-md">
-          <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Legal entities</div>
+          <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Business registrations</div>
           {entities.length === 0 ? (
-            <div className="px-2 py-3 text-sm text-muted-foreground">No entities yet</div>
+            <div className="px-2 py-3 text-sm text-muted-foreground">No registrations yet</div>
           ) : (
             entities.map((e) => (
               <button
@@ -71,7 +71,7 @@ export function EntitySwitcher() {
             className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-left hover:bg-accent"
           >
             <Plus className="h-3.5 w-3.5" />
-            Create new entity
+            New business registration
           </button>
         </div>
       )}
