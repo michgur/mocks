@@ -1,0 +1,1514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Harmony — CRM integration (sync + enrollments)</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#fafafa;
+  --panel:#fff;
+  --border:#e5e7eb;
+  --border-soft:#f1f3f5;
+  --text:#18181b;
+  --text-2:#52525b;
+  --text-3:#9ca3af;
+  --accent:#16a34a;
+  --accent-bg:#dcfce7;
+  --accent-text:#15803d;
+  --primary:#111827;
+  --warn-bg:#fffbeb;
+  --warn-bd:#fde68a;
+  --warn-tx:#92400e;
+  --err-bg:#fef2f2;
+  --err-bd:#fecaca;
+  --err-tx:#b91c1c;
+  --hubspot:#ff7a59;
+  --salesforce:#1798c1;
+  --pipedrive:#1d6f47;
+}
+html,body{height:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+
+.app{display:grid;grid-template-columns:56px 240px 1fr;height:100vh;overflow:hidden}
+
+/* Icon rail */
+.rail{background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:10px 0;gap:4px}
+.rail-logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#0f172a,#334155);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px;margin-bottom:8px}
+.rail-item{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text-3);cursor:pointer;font-size:15px}
+.rail-item:hover{background:var(--bg);color:var(--text)}
+.rail-item.on{background:var(--accent-bg);color:var(--accent-text)}
+.rail-spacer{flex:1}
+.rail-avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#fda4af,#f472b6);margin-bottom:6px}
+
+/* Section sidebar */
+.sidebar{background:var(--panel);border-right:1px solid var(--border);overflow-y:auto;padding:14px 10px}
+.sb-section{font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em;padding:14px 10px 6px}
+.sb-section:first-child{padding-top:4px}
+.sb-item{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:6px;cursor:pointer;color:var(--text-2);font-size:13px;font-weight:500}
+.sb-item:hover{background:var(--bg);color:var(--text)}
+.sb-item.on{background:var(--accent-bg);color:var(--accent-text);font-weight:600}
+.sb-item .ico{width:16px;display:inline-flex;justify-content:center;font-size:13px;color:inherit}
+.sb-item .ico-sq{width:16px;height:16px;border-radius:4px;color:#fff;font-size:9px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.sb-item .sb-mini{margin-left:auto;width:6px;height:6px;border-radius:50%;background:var(--accent)}
+
+/* Main */
+.main{display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
+.topbar{display:flex;align-items:center;gap:10px;padding:12px 24px;border-bottom:1px solid var(--border);background:var(--panel);flex-shrink:0;min-height:58px}
+.crumb{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600;color:var(--text);min-width:0}
+.crumb .back{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--text-2);cursor:pointer}
+.crumb .back:hover{background:var(--bg);color:var(--text)}
+.crumb-sep{color:var(--text-3);font-weight:400}
+.crumb-light{color:var(--text-2);font-weight:500;cursor:pointer}
+.crumb-light:hover{color:var(--text)}
+.topbar-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid transparent;transition:all .12s;font-family:inherit;background:none;color:inherit;line-height:1.2;white-space:nowrap}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover:not(:disabled){background:#000}
+.btn-accent{background:var(--accent-bg);color:var(--accent-text)}
+.btn-accent:hover{background:#bbf7d0}
+.btn-outline{background:#fff;border-color:var(--border);color:var(--text)}
+.btn-outline:hover:not(:disabled){border-color:#cbd5e1;background:#fafafa}
+.btn-ghost{color:var(--text-2)}
+.btn-ghost:hover{background:var(--bg);color:var(--text)}
+.btn-danger-ghost{color:var(--err-tx)}
+.btn-danger-ghost:hover{background:var(--err-bg)}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-lg{padding:10px 18px;font-size:14px}
+
+/* Content area */
+.content{flex:1;overflow-y:auto;padding:28px 32px 60px}
+.content-narrow{max-width:960px;margin:0 auto}
+.page-title{font-size:22px;font-weight:700;color:var(--text);margin-bottom:4px;letter-spacing:-.01em}
+.page-sub{font-size:13px;color:var(--text-2);margin-bottom:24px;max-width:680px;line-height:1.55}
+
+/* Cards */
+.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;margin-bottom:16px}
+.card-pad{padding:18px 20px}
+.card-hd{padding:14px 20px;border-bottom:1px solid var(--border-soft);display:flex;align-items:center;justify-content:space-between;gap:10px}
+.card-hd-title{font-size:14px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px}
+.card-hd-sub{font-size:12px;color:var(--text-2);margin-top:2px;font-weight:400}
+.card-ft{padding:12px 20px;border-top:1px solid var(--border-soft);display:flex;align-items:center;justify-content:space-between;gap:10px;background:#fcfcfd;border-radius:0 0 10px 10px}
+
+/* Integration list */
+.int-row{display:flex;align-items:center;gap:14px;padding:16px 20px;border-bottom:1px solid var(--border-soft);cursor:pointer;transition:background .1s}
+.int-row:last-child{border-bottom:none}
+.int-row:hover{background:#fafafa}
+.int-ico{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:15px;flex-shrink:0}
+.int-name{font-size:14px;font-weight:600;color:var(--text)}
+.int-desc{font-size:12px;color:var(--text-2);margin-top:2px;max-width:480px;line-height:1.45}
+.int-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+
+/* Pills */
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:99px;font-size:11px;font-weight:600;line-height:1.4}
+.pill-mute{background:#f3f4f6;color:var(--text-2)}
+.pill-ok{background:var(--accent-bg);color:var(--accent-text)}
+.pill-warn{background:var(--warn-bg);color:var(--warn-tx);border:1px solid var(--warn-bd)}
+.pill-err{background:var(--err-bg);color:var(--err-tx);border:1px solid var(--err-bd)}
+.pill .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+
+/* Integration header */
+.int-hdr{display:flex;align-items:center;gap:14px;padding-bottom:18px;margin-bottom:18px;border-bottom:1px solid var(--border)}
+.int-hdr-ico{width:48px;height:48px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:19px;flex-shrink:0}
+.int-hdr-title{font-size:20px;font-weight:700;letter-spacing:-.01em}
+.int-hdr-meta{font-size:12px;color:var(--text-2);margin-top:4px;display:flex;align-items:center;gap:8px}
+.int-hdr-actions{margin-left:auto;display:flex;gap:8px;align-items:center}
+
+/* What-this-does list */
+.what{display:flex;gap:12px;padding:14px 0;border-bottom:1px solid var(--border-soft)}
+.what:last-child{border-bottom:none}
+.what-ico{width:28px;height:28px;border-radius:7px;background:var(--bg);color:var(--text-2);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.what-name{font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px}
+.what-sub{font-size:12px;color:var(--text-2);line-height:1.5}
+code.k{background:#f3f4f6;color:var(--text);padding:1px 6px;border-radius:4px;font-family:"SF Mono",ui-monospace,monospace;font-size:11.5px;border:1px solid var(--border-soft)}
+
+/* Banners */
+.banner{display:flex;gap:12px;padding:12px 16px;border-radius:8px;margin-bottom:16px;font-size:13px;line-height:1.5;align-items:flex-start;border:1px solid}
+.banner-ok{background:#f0fdf4;border-color:#bbf7d0;color:#166534}
+.banner-warn{background:var(--warn-bg);border-color:var(--warn-bd);color:var(--warn-tx)}
+.banner-err{background:var(--err-bg);border-color:var(--err-bd);color:var(--err-tx)}
+.banner-info{background:#eff6ff;border-color:#bfdbfe;color:#1e40af}
+.banner .b-ico{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;flex-shrink:0;margin-top:1px;background:rgba(0,0,0,.05)}
+.banner strong{font-weight:700}
+.banner a{color:inherit;text-decoration:underline;cursor:pointer;font-weight:600}
+
+/* Mapping table */
+.maptbl{width:100%;border-collapse:collapse;font-size:13px}
+.maptbl th{text-align:left;font-size:11px;font-weight:600;color:var(--text-3);padding:10px 14px;border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:.04em;background:#fcfcfd}
+.maptbl td{padding:12px 14px;border-bottom:1px solid var(--border-soft);vertical-align:middle}
+.maptbl tr:last-child td{border-bottom:none}
+.maptbl tr.sec-row td{padding:14px 14px 6px;border-bottom:none;font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em;background:#fcfcfd}
+.maptbl tr.sec-row .sec-note{text-transform:none;letter-spacing:0;color:var(--text-3);font-weight:400;margin-left:6px}
+.attr-name{font-weight:600;color:var(--text);font-size:13px}
+.attr-meta{font-size:11px;color:var(--text-3);font-family:"SF Mono",ui-monospace,monospace;margin-top:2px}
+.req-pill{display:inline-block;background:#eff6ff;color:#1e40af;font-size:9px;font-weight:700;padding:2px 6px;border-radius:99px;letter-spacing:.04em;margin-left:6px;vertical-align:middle}
+.opt-pill{display:inline-block;background:#f3f4f6;color:var(--text-2);font-size:9px;font-weight:700;padding:2px 6px;border-radius:99px;letter-spacing:.04em;margin-left:6px;vertical-align:middle}
+.col-ico{width:18px;height:18px;border-radius:4px;color:#fff;font-weight:800;font-size:10px;display:inline-flex;align-items:center;justify-content:center;margin-right:6px;vertical-align:middle}
+
+/* Field select / source picker */
+.src{display:inline-flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12.5px;background:#fff;cursor:pointer;min-width:180px;color:var(--text);user-select:none}
+.src:hover{border-color:#9ca3af}
+.src .mono{font-family:"SF Mono",ui-monospace,monospace;font-size:12px;color:var(--text)}
+.src .arrow{color:var(--text-3);font-size:10px}
+.src.auto{background:#f0fdf4;border-color:#bbf7d0}
+.src.unmapped{background:#fef2f2;border-color:#fecaca;color:var(--err-tx);font-weight:600}
+.src.warn{background:var(--warn-bg);border-color:var(--warn-bd);color:var(--warn-tx)}
+
+.used-pill{display:inline-block;background:#f3f4f6;border:1px solid var(--border);color:var(--text-2);font-size:11px;padding:2px 7px;border-radius:99px;margin-right:4px;margin-bottom:2px;font-weight:500}
+
+/* Source pill on contacts table */
+.src-tag{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text)}
+.src-tag-ico{width:16px;height:16px;border-radius:4px;color:#fff;font-weight:800;font-size:9px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+
+/* Add-contacts menu items */
+.add-menu-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;cursor:pointer}
+.add-menu-item:hover{background:var(--bg)}
+.add-menu-item.disabled{opacity:.5;cursor:not-allowed}
+.add-menu-item.disabled:hover{background:transparent}
+.add-menu-item .ico-sq{width:22px;height:22px;border-radius:5px;color:#fff;font-weight:800;font-size:11px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.add-menu-item .ami-name{font-size:13px;font-weight:600;color:var(--text)}
+.add-menu-item .ami-sub{font-size:11px;color:var(--text-3);margin-top:1px}
+
+/* Empty state */
+.empty{padding:36px 20px;text-align:center;border:1px dashed var(--border);border-radius:10px;background:#fcfcfd}
+.empty-ico{width:42px;height:42px;border-radius:10px;background:#fff;border:1px solid var(--border);display:inline-flex;align-items:center;justify-content:center;font-size:18px;color:var(--text-3);margin-bottom:12px}
+.empty-title{font-size:15px;font-weight:600;margin-bottom:4px}
+.empty-body{font-size:13px;color:var(--text-2);max-width:380px;margin:0 auto 16px;line-height:1.55}
+
+/* Switches / toggles */
+.switch{position:relative;width:34px;height:20px;background:#d4d4d8;border-radius:99px;cursor:pointer;flex-shrink:0;transition:background .15s}
+.switch::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 2px rgba(0,0,0,.1)}
+.switch.on{background:var(--accent)}
+.switch.on::after{left:16px}
+
+.tog-row{display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--border-soft)}
+.tog-row:last-child{border-bottom:none}
+.tog-row .grow{flex:1;min-width:0}
+.tog-title{font-size:13px;font-weight:600}
+.tog-sub{font-size:12px;color:var(--text-2);margin-top:2px;line-height:1.45}
+
+/* Checklist (workflow setup) */
+.chk-row{display:flex;gap:12px;padding:14px 0;border-bottom:1px solid var(--border-soft)}
+.chk-row:last-child{border-bottom:none}
+.chk-bullet{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;margin-top:1px}
+.chk-bullet.done{background:var(--accent-bg);color:var(--accent-text)}
+.chk-bullet.todo{background:#f3f4f6;color:var(--text-2);border:1px solid var(--border)}
+.chk-title{font-size:13px;font-weight:600;margin-bottom:3px}
+.chk-body{font-size:12px;color:var(--text-2);line-height:1.5}
+.chk-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+
+/* Sync hero (top of CRM config) */
+.sync-card{display:flex;gap:14px;padding:18px 20px;align-items:flex-start;background:var(--panel);border:1px solid var(--border);border-radius:10px;margin-bottom:16px}
+.sync-card .grow{flex:1;min-width:0}
+.sync-card .sync-title{font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px}
+.sync-card .sync-body{font-size:12.5px;color:var(--text-2);line-height:1.5;margin-top:4px;max-width:560px}
+.sync-card .sync-meta{font-size:12px;color:var(--text-3);margin-top:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+/* Modal */
+.modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.4);backdrop-filter:blur(2px);z-index:100;display:flex;align-items:center;justify-content:center;animation:fade .15s ease}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.modal{background:#fff;border-radius:12px;width:480px;max-width:92vw;max-height:90vh;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.25);animation:pop .15s ease}
+@keyframes pop{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}
+.modal-hd{padding:6px 14px;background:#f8fafc;border-bottom:1px solid var(--border);font-size:11px;color:var(--text-2);display:flex;align-items:center;gap:6px}
+.modal-bd{padding:24px 28px}
+.modal-ft{padding:14px 28px;background:#f8fafc;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.oauth-logos{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+.oauth-logo{width:46px;height:46px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:18px}
+.oauth-logo.h{background:linear-gradient(135deg,#0f172a,#334155)}
+.oauth-arrow{color:var(--text-3);font-size:18px}
+.oauth-title{font-size:17px;font-weight:700;margin-bottom:6px;letter-spacing:-.01em}
+.oauth-sub{font-size:13px;color:var(--text-2);line-height:1.55;margin-bottom:16px}
+.oauth-acct{background:#f8fafc;border:1px solid var(--border);border-radius:7px;padding:10px 12px;font-size:12.5px;display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.oauth-scopes-h{font-size:11px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+.oauth-scope{display:flex;gap:9px;font-size:13px;padding:6px 0;align-items:flex-start;line-height:1.5}
+.oauth-scope .ck{color:var(--accent);font-weight:800;flex-shrink:0;margin-top:1px}
+
+/* Source picker dropdown */
+.po-backdrop{position:fixed;inset:0;z-index:70;background:transparent}
+.popover{position:fixed;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.12);width:300px;padding:6px;z-index:80;animation:pop .12s ease;max-height:340px;overflow-y:auto}
+.popover-h{font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;padding:8px 10px 4px}
+.po-search{display:flex;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid var(--border-soft);margin-bottom:4px}
+.po-search input{flex:1;border:none;outline:none;font-size:13px;font-family:inherit;background:transparent}
+.po-item{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-radius:6px;cursor:pointer}
+.po-item:hover{background:var(--bg)}
+.po-item .mono{font-family:"SF Mono",ui-monospace,monospace;font-size:12.5px;color:var(--text)}
+.po-item .pmeta{font-size:11px;color:var(--text-3)}
+
+/* Toast */
+.toast-wrap{position:fixed;bottom:24px;right:24px;display:flex;flex-direction:column;gap:8px;z-index:200}
+.toast{background:var(--primary);color:#fff;padding:10px 14px;border-radius:8px;font-size:13px;font-weight:500;box-shadow:0 6px 20px rgba(0,0,0,.18);animation:slide .2s ease;display:flex;align-items:center;gap:8px}
+@keyframes slide{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.toast .ck{color:#34d399;font-weight:800}
+
+.muted{color:var(--text-2)}
+.mono{font-family:"SF Mono",ui-monospace,monospace}
+
+/* Section header (lighter than card-hd) */
+.sec{margin-bottom:28px}
+.sec:last-child{margin-bottom:0}
+.sec-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:10px}
+.sec-h-title{font-size:13px;font-weight:600;color:var(--text)}
+.sec-h-meta{font-size:12px;color:var(--text-3)}
+.bullet-list{list-style:none;padding:0}
+.bullet-list li{display:flex;gap:10px;padding:8px 0;font-size:13px;color:var(--text-2);line-height:1.55;border-bottom:1px solid var(--border-soft)}
+.bullet-list li:last-child{border-bottom:none}
+.bullet-list li::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--text-3);margin-top:9px;flex-shrink:0}
+.bullet-list li strong{color:var(--text);font-weight:600}
+
+/* Enrollments */
+.enroll-row{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border-soft);cursor:pointer}
+.enroll-row:last-child{border-bottom:none}
+.enroll-row:hover{background:#fafafa}
+.enroll-name{font-size:14px;font-weight:600}
+.enroll-meta{font-size:12px;color:var(--text-2);margin-top:3px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.enroll-right{margin-left:auto;display:flex;align-items:center;gap:14px}
+.enroll-count{text-align:right;font-size:12px;color:var(--text-2)}
+.enroll-count .n{font-weight:700;color:var(--text);font-size:14px}
+.crit-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;background:#fff;border:1px solid var(--border);border-radius:99px;font-size:12px;color:var(--text-2)}
+.crit-chip .var{font-family:"SF Mono",ui-monospace,monospace;color:var(--text);font-weight:600}
+.crit-chip .op{color:var(--text-3);font-size:11px}
+.crit-list{display:flex;flex-wrap:wrap;gap:6px}
+
+/* Criteria editor */
+.crit-rule{display:flex;align-items:center;gap:8px;padding:8px 0}
+.crit-rule .sel{padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12.5px;background:#fff;font-family:inherit;cursor:pointer;color:var(--text);min-width:120px}
+.crit-rule .sel:focus{outline:none;border-color:#9ca3af}
+.crit-rule input.val{padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12.5px;font-family:inherit;flex:1;min-width:120px;color:var(--text);background:#fff}
+.crit-rule input.val:focus{outline:none;border-color:#9ca3af}
+.crit-rule .rm{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--text-3);cursor:pointer;flex-shrink:0}
+.crit-rule .rm:hover{background:var(--err-bg);color:var(--err-tx)}
+.crit-rule .field-mono{font-family:"SF Mono",ui-monospace,monospace;font-size:12px}
+.crit-and{font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;padding:2px 0 2px 4px}
+
+.field-row{display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--border-soft)}
+.field-row:last-child{border-bottom:none}
+.field-row .lbl{font-size:13px;font-weight:600;width:160px;flex-shrink:0}
+.field-row .lbl .sub{font-size:11px;font-weight:400;color:var(--text-3);margin-top:2px}
+.field-row .grow{flex:1;min-width:0}
+.field-row input.txt{padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:inherit;width:100%;color:var(--text);background:#fff}
+.field-row input.txt:focus{outline:none;border-color:#9ca3af}
+.field-row select.sel{padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:inherit;color:var(--text);background:#fff;width:100%}
+.field-row select.sel:focus{outline:none;border-color:#9ca3af}
+
+/* Source pills (enrollment editor + list) */
+.src-pills{display:flex;flex-wrap:wrap;gap:8px}
+.src-pill{display:inline-flex;align-items:center;gap:8px;padding:6px 12px 6px 8px;border:1px solid var(--border);border-radius:99px;cursor:pointer;font-size:13px;background:#fff;user-select:none;color:var(--text);transition:all .12s}
+.src-pill:hover{border-color:#9ca3af}
+.src-pill.on{background:var(--accent-bg);border-color:#bbf7d0;color:var(--accent-text);font-weight:600}
+.src-pill .ico-sq{width:18px;height:18px;border-radius:4px;color:#fff;font-weight:800;font-size:10px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.src-pill .ck{color:var(--accent-text);font-weight:800;font-size:12px}
+.src-pill.add{color:var(--text-2);border-style:dashed;font-weight:500;padding:6px 12px}
+.src-pill.add:hover{color:var(--text);background:#fafafa}
+.src-pill.muted-off{opacity:.6}
+
+/* Mini source row meta on enrollment list */
+.src-mini{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--text-2)}
+.src-mini .ico-sq{width:14px;height:14px;border-radius:3px;color:#fff;font-weight:800;font-size:8px;display:inline-flex;align-items:center;justify-content:center}
+
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:#e5e7eb;border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:#d1d5db}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="rail">
+    <div class="rail-logo">H</div>
+    <div class="rail-item" title="Home">⌂</div>
+    <div class="rail-item" title="Agents">✦</div>
+    <div class="rail-item" id="rail-contacts" title="Contacts" onclick="goContacts()">☰</div>
+    <div class="rail-item" title="Phone">☎</div>
+    <div class="rail-item" id="rail-settings" title="Settings" onclick="goIntegrations()">⚙</div>
+    <div class="rail-spacer"></div>
+    <div class="rail-avatar"></div>
+  </div>
+
+  <div class="sidebar" id="sidebar"></div>
+
+  <div class="main">
+    <div class="topbar" id="topbar"></div>
+    <div class="content"><div class="content-narrow" id="view"></div></div>
+  </div>
+</div>
+
+<div id="modal-root"></div>
+<div id="popover-root"></div>
+<div class="toast-wrap" id="toasts"></div>
+
+<script>
+/* ============================================================
+   STATE
+============================================================ */
+const state = {
+  view: 'contacts',
+  modal: null,
+  popover: null,
+  connections: { hubspot: false, salesforce: false },
+  authorizing: null,
+  // NEW: sync mode (default on). Controls whether contacts are pulled or
+  // pushed via CRM workflow.
+  syncEnabled: { hubspot: true, salesforce: true },
+  mapping: {
+    hubspot: {
+      first_name: { source: 'firstname', auto: true },
+      phone: { source: 'phone', auto: true },
+      timezone: null,
+      company: { source: 'company', auto: true },
+      job_title: { source: 'jobtitle', auto: true },
+      last_demo_date: { source: 'hs_last_demo_date', auto: true },
+      lead_score: { source: 'hs_lead_score', auto: true },
+      churn_risk: null,
+    },
+    salesforce: {
+      first_name: { source: 'FirstName', auto: true },
+      phone: { source: 'Phone', auto: true },
+      timezone: { source: 'TimeZoneSidKey', auto: true },
+      company: { source: 'Account.Name', auto: true },
+      job_title: { source: 'Title', auto: true },
+      last_demo_date: null,
+      lead_score: { source: 'LeadScore__c', auto: true },
+      churn_risk: null,
+    }
+  },
+  writeback: {
+    log_calls: true, log_sequences: true, create_props: true, custom_events: false,
+  },
+  workflowInstalled: { hubspot: false, salesforce: false },
+  // NEW: account-level enrollments
+  enrollments: [
+    {
+      id: 'e1',
+      name: 'Senior buyers — Q2 outbound',
+      agent: 'Q2 Outreach',
+      sources: ['hubspot', 'salesforce'],
+      enabled: true,
+      enrolled: 124,
+      enrollCriteria: [
+        { field: 'job_title', op: 'contains', value: 'VP' },
+        { field: 'lead_score', op: 'gte', value: '60' },
+      ],
+      unenrollCriteria: [
+        { field: 'last_demo_date', op: 'is_set', value: '' },
+      ],
+      allowReenroll: false,
+      cooldownDays: 30,
+    },
+  ],
+  editingEnrollmentId: null, // 'new' or existing id
+};
+
+const REQUIRED = ['first_name', 'phone', 'timezone'];
+const OPTIONAL = ['company', 'job_title', 'last_demo_date', 'lead_score', 'churn_risk'];
+const ALL_ATTRS = [...REQUIRED, ...OPTIONAL];
+
+const AGENTS = ['Q2 Outreach', 'Inbound Follow-up', 'Re-engagement'];
+
+const OPS = {
+  string: [
+    { k:'equals',   label:'equals' },
+    { k:'contains', label:'contains' },
+    { k:'is_set',   label:'is set' },
+    { k:'not_set',  label:'is empty' },
+  ],
+  number: [
+    { k:'gte', label:'≥' },
+    { k:'lte', label:'≤' },
+    { k:'eq',  label:'=' },
+    { k:'is_set', label:'is set' },
+  ],
+  date: [
+    { k:'before',       label:'before' },
+    { k:'after',        label:'after' },
+    { k:'within_days',  label:'within last N days' },
+    { k:'is_set',       label:'is set' },
+    { k:'not_set',      label:'is empty' },
+  ],
+};
+
+const HS_FIELDS = [
+  { name: 'firstname', desc: 'Contact · default' },
+  { name: 'lastname', desc: 'Contact · default' },
+  { name: 'phone', desc: 'Contact · default' },
+  { name: 'mobilephone', desc: 'Contact · default' },
+  { name: 'hs_timezone', desc: 'Contact · auto-derived' },
+  { name: 'ip_timezone', desc: 'Contact · derived from IP' },
+  { name: 'company', desc: 'Contact · default' },
+  { name: 'jobtitle', desc: 'Contact · default' },
+  { name: 'hs_last_demo_date', desc: 'Contact · custom property' },
+  { name: 'hs_lead_score', desc: 'Contact · HubSpot score' },
+  { name: 'hs_churn_risk_score', desc: 'Contact · custom property' },
+];
+const SF_FIELDS = [
+  { name: 'FirstName', desc: 'Contact · standard' },
+  { name: 'LastName', desc: 'Contact · standard' },
+  { name: 'Phone', desc: 'Contact · standard' },
+  { name: 'MobilePhone', desc: 'Contact · standard' },
+  { name: 'TimeZoneSidKey', desc: 'User · standard' },
+  { name: 'Account.Name', desc: 'Account · standard' },
+  { name: 'Title', desc: 'Contact · standard' },
+  { name: 'LastDemoDate__c', desc: 'Contact · custom field' },
+  { name: 'LeadScore__c', desc: 'Contact · custom field' },
+  { name: 'ChurnRisk__c', desc: 'Contact · custom field' },
+];
+const CONTACTS = [
+  { name:'Sarah Chen',      phone:'+1 415 555 0102', company:'Acme Inc',          title:'VP Sales',        source:'hubspot',    added:'12m ago' },
+  { name:'Marcus Hill',     phone:'+1 415 555 0118', company:'Northwind',         title:'CTO',             source:'salesforce', added:'38m ago' },
+  { name:'Priya Shah',      phone:'+1 415 555 0143', company:'Globex',            title:'Head of Ops',     source:'hubspot',    added:'1h ago' },
+  { name:'Jordan Kim',      phone:'+1 628 555 0211', company:'Initech',           title:'Director',        source:'hubspot',    added:'2h ago' },
+  { name:'Lena Müller',     phone:'+1 628 555 0307', company:'Soylent Corp',      title:'CFO',             source:'api',        added:'3h ago' },
+  { name:'Devon Patel',     phone:'+1 628 555 0489', company:'Massive Dynamic',   title:'VP Eng',          source:'salesforce', added:'4h ago' },
+  { name:'Aisha Brown',     phone:'+1 628 555 0524', company:'Pied Piper',        title:'Head of Sales',   source:'hubspot',    added:'5h ago' },
+  { name:'Tom Reyes',       phone:'+1 628 555 0631', company:'Hooli',             title:'Product Lead',    source:'hubspot',    added:'6h ago' },
+  { name:'Maya Johansson',  phone:'+1 628 555 0748', company:'Stark Industries',  title:'COO',             source:'api',        added:'1d ago' },
+  { name:'Felix Wei',       phone:'+1 628 555 0852', company:'Wayne Enterprises', title:'VP Marketing',    source:'salesforce', added:'1d ago' },
+  { name:'Olivia Park',     phone:'+1 628 555 0967', company:'Cyberdyne',         title:'Sales Engineer',  source:'hubspot',    added:'2d ago' },
+  { name:'Raj Mehta',       phone:'+1 628 555 1082', company:'Aperture Science',  title:'GM',              source:'salesforce', added:'2d ago' },
+];
+
+const ATTR_DEFS = {
+  first_name: { label: 'First name', type: 'string', usedBy: ['Q2 Outreach', 'Inbound Follow-up', 'Re-engagement'] },
+  phone: { label: 'Phone', type: 'string', usedBy: ['Q2 Outreach', 'Inbound Follow-up', 'Re-engagement'] },
+  timezone: { label: 'Timezone', type: 'string', usedBy: ['Q2 Outreach', 'Inbound Follow-up', 'Re-engagement'] },
+  company: { label: 'Company', type: 'string', usedBy: ['Q2 Outreach', 'Inbound Follow-up'] },
+  job_title: { label: 'Job title', type: 'string', usedBy: ['Q2 Outreach', 'Inbound Follow-up'] },
+  last_demo_date: { label: 'Last demo date', type: 'date', usedBy: ['Q2 Outreach'] },
+  lead_score: { label: 'Lead score', type: 'number', usedBy: ['Q2 Outreach', 'Re-engagement'] },
+  churn_risk: { label: 'Churn risk', type: 'string', usedBy: ['Re-engagement'] },
+};
+
+/* ============================================================
+   HELPERS
+============================================================ */
+const $ = (id) => document.getElementById(id);
+function anyConnected(){ return state.connections.hubspot || state.connections.salesforce; }
+function connectedCRMs(){
+  const out = [];
+  if(state.connections.hubspot) out.push('hubspot');
+  if(state.connections.salesforce) out.push('salesforce');
+  return out;
+}
+function sourceState(crm, attr){ return state.mapping[crm][attr]; }
+function unmappedRequired(crm){ return REQUIRED.filter(a => !sourceState(crm, a)); }
+function syncedCRMs(){ return connectedCRMs().filter(c => state.syncEnabled[c]); }
+function fieldMappedSomewhere(attr){
+  return syncedCRMs().some(c => !!sourceState(c, attr));
+}
+function opLabel(field, opKey){
+  const type = (ATTR_DEFS[field] || {}).type || 'string';
+  const list = OPS[type] || OPS.string;
+  const f = list.find(o => o.k === opKey);
+  return f ? f.label : opKey;
+}
+function opNeedsValue(opKey){
+  return !['is_set','not_set'].includes(opKey);
+}
+function toast(msg){
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.innerHTML = `<span class="ck">✓</span><span>${msg}</span>`;
+  $('toasts').appendChild(t);
+  setTimeout(()=>{ t.style.opacity='0'; t.style.transform='translateY(8px)'; t.style.transition='all .2s'; setTimeout(()=>t.remove(),220); }, 2400);
+}
+function uid(){ return 'e' + Math.random().toString(36).slice(2,8); }
+
+const SOURCE_META = {
+  hubspot:    { name:'HubSpot',    bg:'var(--hubspot)',    letter:'H' },
+  salesforce: { name:'Salesforce', bg:'var(--salesforce)', letter:'S' },
+  pipedrive:  { name:'Pipedrive',  bg:'var(--pipedrive)',  letter:'P' },
+};
+function sourcePillsFor(selected, onToggleFnName){
+  const available = syncedCRMs();
+  if(available.length === 0){
+    return `<div class="muted" style="font-size:12.5px">No synced sources yet. Connect one to enroll contacts.</div>`;
+  }
+  return available.map(c => {
+    const m = SOURCE_META[c];
+    const on = (selected || []).includes(c);
+    return `<div class="src-pill ${on?'on':''}" onclick="${onToggleFnName}('${c}')">
+      <span class="ico-sq" style="background:${m.bg}">${m.letter}</span>
+      <span>${m.name}</span>
+      ${on ? '<span class="ck">✓</span>' : ''}
+    </div>`;
+  }).join('');
+}
+
+/* ============================================================
+   NAVIGATION
+============================================================ */
+function goContacts(){ state.view='contacts'; render(); }
+function goIntegrations(){ state.view='integrations'; render(); }
+function goFields(){ state.view='fields'; render(); }
+function goEnrollments(){ state.view='enrollments'; state.editingEnrollmentId=null; render(); }
+function goEnrollmentNew(){
+  state.view='enrollment-edit';
+  state.editingEnrollmentId='new';
+  state._draft = {
+    id: uid(),
+    name: '',
+    agent: AGENTS[0],
+    sources: syncedCRMs(),
+    enabled: true,
+    enrolled: 0,
+    enrollCriteria: [],
+    unenrollCriteria: [],
+    allowReenroll: false,
+    cooldownDays: 30,
+  };
+  render();
+}
+function goEnrollmentEdit(id){
+  const e = state.enrollments.find(x => x.id === id);
+  if(!e) return;
+  state.view='enrollment-edit';
+  state.editingEnrollmentId=id;
+  state._draft = JSON.parse(JSON.stringify(e));
+  render();
+}
+function goHubSpotPre(){ state.view='hubspot-pre'; render(); }
+function goHubSpotConfig(){ state.view='hubspot-config'; render(); }
+function goSalesforcePre(){ state.view='salesforce-pre'; render(); }
+function goSalesforceConfig(){ state.view='salesforce-config'; render(); }
+
+function openOAuth(crm){ state.modal = 'oauth-' + crm; state.authorizing = crm; render(); }
+function cancelOAuth(){ state.modal = null; state.authorizing = null; render(); }
+function grantOAuth(){
+  const crm = state.authorizing;
+  state.connections[crm] = true;
+  state.modal = null;
+  state.authorizing = null;
+  state.view = crm + '-config';
+  render();
+  toast(`${crm === 'hubspot' ? 'HubSpot' : 'Salesforce'} connected · syncing contacts`);
+}
+function disconnect(crm){
+  if(!confirm(`Disconnect ${crm === 'hubspot' ? 'HubSpot' : 'Salesforce'}? Synced contacts will stop refreshing.`)) return;
+  state.connections[crm] = false;
+  state.workflowInstalled[crm] = false;
+  state.view = 'integrations';
+  render();
+  toast(`${crm === 'hubspot' ? 'HubSpot' : 'Salesforce'} disconnected`);
+}
+
+function toggleSync(crm){
+  state.syncEnabled[crm] = !state.syncEnabled[crm];
+  render();
+  toast(`Sync ${state.syncEnabled[crm] ? 'enabled' : 'disabled'} for ${crm === 'hubspot' ? 'HubSpot' : 'Salesforce'}`);
+}
+
+/* ============================================================
+   ENROLLMENT EDITOR HELPERS
+============================================================ */
+function draft(){ return state._draft; }
+function draftUpdate(patch){ Object.assign(state._draft, patch); render(); }
+function addCrit(kind){
+  const k = kind === 'enroll' ? 'enrollCriteria' : 'unenrollCriteria';
+  // pick a first field that has at least one mapping; fallback to first
+  const firstField = ALL_ATTRS.find(fieldMappedSomewhere) || ALL_ATTRS[0];
+  const type = ATTR_DEFS[firstField].type;
+  state._draft[k].push({ field: firstField, op: OPS[type][0].k, value: '' });
+  render();
+}
+function rmCrit(kind, idx){
+  const k = kind === 'enroll' ? 'enrollCriteria' : 'unenrollCriteria';
+  state._draft[k].splice(idx, 1);
+  render();
+}
+function updateCrit(kind, idx, patch){
+  const k = kind === 'enroll' ? 'enrollCriteria' : 'unenrollCriteria';
+  const rule = state._draft[k][idx];
+  // If field changed and op no longer valid, reset op
+  if(patch.field && patch.field !== rule.field){
+    const newType = ATTR_DEFS[patch.field].type;
+    const validOps = OPS[newType].map(o => o.k);
+    if(!validOps.includes(rule.op)) patch.op = OPS[newType][0].k;
+  }
+  Object.assign(rule, patch);
+  render();
+}
+function toggleEnrollmentSource(crm){
+  const d = state._draft;
+  if(!d) return;
+  if(d.sources.includes(crm)) d.sources = d.sources.filter(s => s !== crm);
+  else d.sources = [...d.sources, crm];
+  render();
+}
+
+function saveEnrollment(){
+  const d = state._draft;
+  if(!d.name.trim()){ toast('Give the enrollment a name'); return; }
+  if(!d.sources || d.sources.length === 0){ toast('Pick at least one contact source'); return; }
+  if(d.enrollCriteria.length === 0){ toast('Add at least one enrollment condition'); return; }
+  const existing = state.enrollments.findIndex(x => x.id === d.id);
+  if(existing >= 0) state.enrollments[existing] = d;
+  else state.enrollments.push(d);
+  state.view = 'enrollments';
+  state.editingEnrollmentId = null;
+  state._draft = null;
+  render();
+  toast(existing >= 0 ? 'Enrollment updated' : 'Enrollment created');
+}
+function cancelEnrollment(){
+  state.view = 'enrollments';
+  state.editingEnrollmentId = null;
+  state._draft = null;
+  render();
+}
+function deleteEnrollment(id){
+  if(!confirm('Delete this enrollment? Currently enrolled contacts will be unenrolled.')) return;
+  state.enrollments = state.enrollments.filter(e => e.id !== id);
+  if(state.view === 'enrollment-edit') state.view = 'enrollments';
+  render();
+  toast('Enrollment deleted');
+}
+function toggleEnrollmentEnabled(id){
+  const e = state.enrollments.find(x => x.id === id);
+  if(!e) return;
+  e.enabled = !e.enabled;
+  render();
+}
+
+/* ============================================================
+   POPOVER (source picker + add menu)
+============================================================ */
+function openSourcePicker(event, crm, attr){
+  event.stopPropagation();
+  const rect = event.currentTarget.getBoundingClientRect();
+  const x = Math.min(rect.left, window.innerWidth - 316);
+  const y = rect.bottom + 6;
+  state.popover = { kind: 'field-picker', x, y, crm, attr, filter: '' };
+  renderPopover();
+  setTimeout(() => { const s = document.getElementById('po-search-input'); if(s) s.focus(); }, 0);
+}
+function openAddMenu(event){
+  event.stopPropagation();
+  const rect = event.currentTarget.getBoundingClientRect();
+  const width = 260;
+  const x = rect.right - width;
+  const y = rect.bottom + 6;
+  state.popover = { kind: 'add-menu', x, y, width };
+  renderPopover();
+}
+function closePopover(){
+  state.popover = null;
+  $('popover-root').innerHTML = '';
+}
+function pickSource(crm, attr, field){
+  closePopover();
+  state.mapping[crm][attr] = { source: field, auto: false };
+  render();
+  toast(`Mapped ${ATTR_DEFS[attr].label} → ${field}`);
+}
+function clearSource(crm, attr){
+  closePopover();
+  state.mapping[crm][attr] = null;
+  render();
+}
+
+function renderPopover(){
+  const root = $('popover-root');
+  root.innerHTML = '';
+  if(!state.popover) return;
+
+  if(state.popover.kind === 'add-menu'){
+    const { x, y, width } = state.popover;
+    const item = (src, name, bg, letter, sub, disabled=false) => `
+      <div class="add-menu-item ${disabled?'disabled':''}" ${disabled?'':`data-source="${src}"`}>
+        <div class="ico-sq" style="background:${bg}">${letter}</div>
+        <div>
+          <div class="ami-name">${name}</div>
+          <div class="ami-sub">${sub}</div>
+        </div>
+      </div>`;
+    root.innerHTML = `
+      <div class="po-backdrop"></div>
+      <div class="popover" style="left:${x}px;top:${y}px;width:${width}px">
+        <div class="popover-h">Connect a source</div>
+        ${item('hubspot', 'HubSpot', 'var(--hubspot)', 'H', state.connections.hubspot ? 'Connected' : 'Sync or workflow-driven')}
+        ${item('salesforce', 'Salesforce', 'var(--salesforce)', 'S', state.connections.salesforce ? 'Connected' : 'Sync or Flow-driven')}
+        ${item('pipedrive', 'Pipedrive', 'var(--pipedrive)', 'P', 'Coming soon', true)}
+      </div>`;
+    return;
+  }
+
+  // field-picker
+  const { x, y, crm, attr, filter } = state.popover;
+  const fields = (crm === 'hubspot' ? HS_FIELDS : SF_FIELDS)
+    .filter(f => !filter || f.name.toLowerCase().includes(filter.toLowerCase()));
+  const current = state.mapping[crm][attr];
+  const items = fields.length === 0
+    ? '<div class="po-item muted" style="cursor:default">No fields match</div>'
+    : fields.map(f => `
+        <div class="po-item" data-field="${f.name}">
+          <div>
+            <div class="mono">${f.name}</div>
+            <div class="pmeta">${f.desc}</div>
+          </div>
+          ${current && current.source === f.name ? '<span style="color:var(--accent);font-weight:800">✓</span>' : ''}
+        </div>`).join('');
+  const clear = current ? `<div class="po-item" data-action="clear" style="color:var(--err-tx);border-top:1px solid var(--border-soft);margin-top:4px">Clear mapping</div>` : '';
+  root.innerHTML = `
+    <div class="po-backdrop"></div>
+    <div class="popover" style="left:${x}px;top:${y}px">
+      <div class="po-search">
+        <span style="color:var(--text-3)">⌕</span>
+        <input id="po-search-input" placeholder="Search ${crm === 'hubspot' ? 'HubSpot' : 'Salesforce'} fields..." value="${filter}"/>
+      </div>
+      <div class="popover-h">${crm === 'hubspot' ? 'HubSpot' : 'Salesforce'} fields</div>
+      <div id="po-items">${items}</div>
+      ${clear}
+    </div>`;
+}
+
+$('popover-root').addEventListener('click', (e) => {
+  if(!state.popover) return;
+  if(e.target.closest('.po-backdrop')){
+    closePopover();
+    return;
+  }
+  if(state.popover.kind === 'add-menu'){
+    const menuItem = e.target.closest('.add-menu-item[data-source]');
+    if(!menuItem) return;
+    const src = menuItem.dataset.source;
+    closePopover();
+    if(src === 'hubspot') state.connections.hubspot ? goHubSpotConfig() : goHubSpotPre();
+    else if(src === 'salesforce') state.connections.salesforce ? goSalesforceConfig() : goSalesforcePre();
+    return;
+  }
+  const item = e.target.closest('.po-item');
+  if(!item) return;
+  if(item.dataset.action === 'clear'){
+    clearSource(state.popover.crm, state.popover.attr);
+  } else if(item.dataset.field){
+    pickSource(state.popover.crm, state.popover.attr, item.dataset.field);
+  }
+});
+
+$('popover-root').addEventListener('input', (e) => {
+  if(!state.popover || e.target.id !== 'po-search-input') return;
+  state.popover.filter = e.target.value;
+  const fields = (state.popover.crm === 'hubspot' ? HS_FIELDS : SF_FIELDS)
+    .filter(f => f.name.toLowerCase().includes(state.popover.filter.toLowerCase()));
+  const current = state.mapping[state.popover.crm][state.popover.attr];
+  const items = $('po-items');
+  if(!items) return;
+  items.innerHTML = fields.length === 0
+    ? '<div class="po-item muted" style="cursor:default">No fields match</div>'
+    : fields.map(f => `
+        <div class="po-item" data-field="${f.name}">
+          <div><div class="mono">${f.name}</div><div class="pmeta">${f.desc}</div></div>
+          ${current && current.source === f.name ? '<span style="color:var(--accent);font-weight:800">✓</span>' : ''}
+        </div>`).join('');
+});
+
+/* ============================================================
+   TOGGLES
+============================================================ */
+function installWorkflow(crm){
+  state.workflowInstalled[crm] = true;
+  render();
+  toast(`Workflow ${crm === 'hubspot' ? 'in HubSpot' : 'in Salesforce'} marked as live`);
+}
+
+/* ============================================================
+   SIDEBAR
+============================================================ */
+function renderSidebar(){
+  if(state.view === 'contacts'){
+    return `
+      <div class="sb-section">Contacts</div>
+      <div class="sb-item on"><span class="ico">●</span>All contacts</div>
+      <div class="sb-item"><span class="ico">○</span>Lists</div>
+      <div class="sb-item"><span class="ico">○</span>Segments</div>
+    `;
+  }
+  const enrollmentViews = ['enrollments','enrollment-edit'];
+  return `
+    <div class="sb-section">Account</div>
+    <div class="sb-item"><span class="ico">⚙</span>General</div>
+    <div class="sb-item"><span class="ico">⎙</span>Members</div>
+    <div class="sb-item"><span class="ico">⎘</span>Billing</div>
+    <div class="sb-item ${state.view==='fields'?'on':''}" onclick="goFields()"><span class="ico">≡</span>Contact fields</div>
+    <div class="sb-item ${enrollmentViews.includes(state.view)?'on':''}" onclick="goEnrollments()"><span class="ico">⇲</span>Enrollments</div>
+    <div class="sb-section">&nbsp;</div>
+    <div class="sb-item ${['integrations','hubspot-pre','hubspot-config','salesforce-pre','salesforce-config'].includes(state.view)?'on':''}" onclick="goIntegrations()"><span class="ico">⌬</span>Integrations</div>
+    <div class="sb-item"><span class="ico">{}</span>API keys</div>
+  `;
+}
+
+/* ============================================================
+   TOPBAR
+============================================================ */
+function renderTopbar(){
+  const v = state.view;
+  let crumb = '';
+  let actions = '';
+  if(v === 'contacts'){
+    crumb = `<span>Contacts</span>`;
+    actions = `<button class="btn btn-outline btn-sm" onclick="goEnrollments()">Enrollments</button><button class="btn btn-primary btn-sm" onclick="openAddMenu(event)">+ Connect a source ▾</button>`;
+  } else if(v === 'integrations'){
+    crumb = `<span class="crumb-light">Settings</span> <span class="crumb-sep">/</span> <span>Integrations</span>`;
+  } else if(v === 'fields'){
+    crumb = `<span class="crumb-light">Settings</span> <span class="crumb-sep">/</span> <span>Contact fields</span>`;
+  } else if(v === 'enrollments'){
+    crumb = `<span class="crumb-light">Settings</span> <span class="crumb-sep">/</span> <span>Enrollments</span>`;
+    actions = `<button class="btn btn-primary btn-sm" onclick="goEnrollmentNew()">+ New enrollment</button>`;
+  } else if(v === 'enrollment-edit'){
+    const isNew = state.editingEnrollmentId === 'new';
+    crumb = `<span class="back" onclick="cancelEnrollment()">←</span><span class="crumb-light" onclick="goEnrollments()">Enrollments</span> <span class="crumb-sep">/</span> <span>${isNew?'New enrollment':(state._draft && state._draft.name || 'Edit')}</span>`;
+    actions = `${!isNew?`<button class="btn btn-danger-ghost btn-sm" onclick="deleteEnrollment('${state.editingEnrollmentId}')">Delete</button>`:''}<button class="btn btn-ghost btn-sm" onclick="cancelEnrollment()">Cancel</button><button class="btn btn-primary btn-sm" onclick="saveEnrollment()">${isNew?'Create':'Save'}</button>`;
+  } else if(v === 'hubspot-pre'){
+    crumb = `<span class="back" onclick="goIntegrations()">←</span><span class="crumb-light" onclick="goIntegrations()">Integrations</span> <span class="crumb-sep">/</span> <span>HubSpot</span>`;
+  } else if(v === 'hubspot-config'){
+    crumb = `<span class="crumb-light" onclick="goIntegrations()">Integrations</span> <span class="crumb-sep">/</span> <span>HubSpot</span>`;
+    actions = `<button class="btn btn-outline btn-sm">Reconnect</button><button class="btn btn-danger-ghost btn-sm" onclick="disconnect('hubspot')">Disconnect</button>`;
+  } else if(v === 'salesforce-pre'){
+    crumb = `<span class="back" onclick="goIntegrations()">←</span><span class="crumb-light" onclick="goIntegrations()">Integrations</span> <span class="crumb-sep">/</span> <span>Salesforce</span>`;
+  } else if(v === 'salesforce-config'){
+    crumb = `<span class="crumb-light" onclick="goIntegrations()">Integrations</span> <span class="crumb-sep">/</span> <span>Salesforce</span>`;
+    actions = `<button class="btn btn-outline btn-sm">Reconnect</button><button class="btn btn-danger-ghost btn-sm" onclick="disconnect('salesforce')">Disconnect</button>`;
+  }
+  return `<div class="crumb">${crumb}</div><div class="topbar-actions">${actions}</div>`;
+}
+
+/* ============================================================
+   VIEWS
+============================================================ */
+function viewContacts(){
+  const sourceTag = (src) => {
+    const meta = src === 'hubspot' ? {bg:'var(--hubspot)', letter:'H', name:'HubSpot'}
+               : src === 'salesforce' ? {bg:'var(--salesforce)', letter:'S', name:'Salesforce'}
+               : {bg:'#52525b', letter:'{', name:'API'};
+    return `<span class="src-tag"><span class="src-tag-ico" style="background:${meta.bg}">${meta.letter}</span>${meta.name}</span>`;
+  };
+  const rows = CONTACTS.map(c => `
+    <tr>
+      <td><div style="font-weight:600">${c.name}</div></td>
+      <td class="mono" style="font-size:12px">${c.phone}</td>
+      <td>${c.company}</td>
+      <td class="muted">${c.title}</td>
+      <td>${sourceTag(c.source)}</td>
+      <td class="muted" style="font-size:12px">${c.added}</td>
+    </tr>`).join('');
+  return `
+    <div class="card" style="padding:0;overflow:hidden">
+      <table class="maptbl">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Phone</th>
+            <th>Company</th>
+            <th>Title</th>
+            <th>Source</th>
+            <th>Added</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="card-ft">
+        <span class="muted" style="font-size:12px">${CONTACTS.length} contacts</span>
+        <div></div>
+      </div>
+    </div>
+  `;
+}
+
+function viewFields(){
+  const row = (attr) => {
+    const d = ATTR_DEFS[attr];
+    const isReq = REQUIRED.includes(attr);
+    const used = d.usedBy.map(u => `<span class="used-pill">${u}</span>`).join('');
+    return `
+      <tr>
+        <td>
+          <div class="attr-name">${d.label}${isReq?'<span class="req-pill">REQ</span>':''}</div>
+          <div class="attr-meta">{{${attr}}} · ${d.type}</div>
+        </td>
+        <td>${used}</td>
+      </tr>`;
+  };
+  const rows = ALL_ATTRS.map(row).join('');
+  return `
+    <div class="page-title" style="margin-bottom:20px">Contact fields</div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <table class="maptbl">
+        <thead>
+          <tr>
+            <th style="width:50%">Field</th>
+            <th>Used by</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="card-ft">
+        <div></div>
+        <button class="btn btn-outline btn-sm">+ Add field</button>
+      </div>
+    </div>
+  `;
+}
+
+function viewIntegrations(){
+  const integrations = [
+    { id:'hubspot', name:'HubSpot', desc:'Sync contacts or enroll via workflow actions.', bg:'var(--hubspot)', letter:'H' },
+    { id:'salesforce', name:'Salesforce', desc:'Sync records or enroll via Flow Builder.', bg:'var(--salesforce)', letter:'S' },
+    { id:'pipedrive', name:'Pipedrive', desc:'Sync persons or enroll via automations.', bg:'var(--pipedrive)', letter:'P' },
+  ];
+  const rows = integrations.map(i => {
+    const connected = state.connections[i.id];
+    let right;
+    if(connected){
+      const cfgFn = i.id==='hubspot' ? 'goHubSpotConfig()' : 'goSalesforceConfig()';
+      const modePill = state.syncEnabled[i.id]
+        ? `<span class="pill pill-ok"><span class="dot"></span>Syncing</span>`
+        : `<span class="pill pill-mute">Workflow only</span>`;
+      right = `${modePill}<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();${cfgFn}">Configure</button>`;
+    } else if(i.id === 'hubspot' || i.id === 'salesforce'){
+      const preFn = i.id==='hubspot' ? 'goHubSpotPre()' : 'goSalesforcePre()';
+      right = `<span class="pill pill-mute">Not connected</span><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();${preFn}">Connect</button>`;
+    } else {
+      right = `<span class="pill pill-mute">Not connected</span><button class="btn btn-outline btn-sm" disabled>Coming soon</button>`;
+    }
+    const click = (i.id === 'hubspot' || i.id === 'salesforce')
+      ? `onclick="${connected ? (i.id==='hubspot' ? 'goHubSpotConfig()' : 'goSalesforceConfig()') : (i.id==='hubspot' ? 'goHubSpotPre()' : 'goSalesforcePre()')}"`
+      : '';
+    return `
+      <div class="int-row" ${click}>
+        <div class="int-ico" style="background:${i.bg}">${i.letter}</div>
+        <div>
+          <div class="int-name">${i.name}</div>
+          <div class="int-desc">${i.desc}</div>
+        </div>
+        <div class="int-right">${right}</div>
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="page-title" style="margin-bottom:6px">Integrations</div>
+    <div class="page-sub">Connect a CRM to sync contacts into Harmony, or to let CRM workflows enroll contacts in your agents.</div>
+    <div class="card" style="padding:0">${rows}</div>
+  `;
+}
+
+function viewHubSpotPre(){
+  return `
+    <div class="int-hdr">
+      <div class="int-hdr-ico" style="background:var(--hubspot)">H</div>
+      <div>
+        <div class="int-hdr-title">HubSpot</div>
+        <div class="int-hdr-meta"><span class="pill pill-mute">Not connected</span></div>
+      </div>
+      <div class="int-hdr-actions">
+        <button class="btn btn-primary" onclick="openOAuth('hubspot')">Connect HubSpot</button>
+      </div>
+    </div>
+
+    <ul class="bullet-list">
+      <li><strong>Sync mode</strong> (default): Harmony pulls all HubSpot contacts. Enrollment is decided by account-level rules in Harmony.</li>
+      <li><strong>Workflow mode</strong>: HubSpot workflows enroll specific contacts via the <code class="k">Harmony: Enroll in agent</code> action.</li>
+      <li>Logs each call back as a HubSpot engagement.</li>
+    </ul>
+  `;
+}
+
+function viewSalesforcePre(){
+  return `
+    <div class="int-hdr">
+      <div class="int-hdr-ico" style="background:var(--salesforce)">S</div>
+      <div>
+        <div class="int-hdr-title">Salesforce</div>
+        <div class="int-hdr-meta"><span class="pill pill-mute">Not connected</span></div>
+      </div>
+      <div class="int-hdr-actions">
+        <button class="btn btn-primary" onclick="openOAuth('salesforce')">Connect Salesforce</button>
+      </div>
+    </div>
+
+    <ul class="bullet-list">
+      <li><strong>Sync mode</strong> (default): Harmony pulls leads and contacts. Enrollment is decided by account-level rules.</li>
+      <li><strong>Flow mode</strong>: Salesforce Flows enroll records via the <code class="k">Harmony: Enroll in agent</code> invocable action.</li>
+      <li>Logs each call as a Task on the record.</li>
+    </ul>
+  `;
+}
+
+function crmMappingTable(crm){
+  const crmName = crm === 'hubspot' ? 'HubSpot' : 'Salesforce';
+  const cell = (attr) => {
+    const m = state.mapping[crm][attr];
+    if(!m){
+      const isReq = REQUIRED.includes(attr);
+      return `<td><div class="src ${isReq?'unmapped':'warn'}" onclick="openSourcePicker(event,'${crm}','${attr}')"><span>${isReq?'Choose source':'Not mapped'}</span><span class="arrow">▾</span></div></td>`;
+    }
+    return `<td><div class="src ${m.auto?'auto':''}" onclick="openSourcePicker(event,'${crm}','${attr}')"><span class="mono">${m.source}</span><span class="arrow">▾</span></div></td>`;
+  };
+  const row = (attr) => {
+    const d = ATTR_DEFS[attr];
+    const isReq = REQUIRED.includes(attr);
+    return `
+      <tr>
+        <td style="width:48%">
+          <div class="attr-name">${d.label}${isReq?'<span class="req-pill">REQ</span>':''}</div>
+          <div class="attr-meta">{{${attr}}} · ${d.type}</div>
+        </td>
+        ${cell(attr)}
+      </tr>`;
+  };
+  const standardRows = ['first_name','phone','timezone','company','job_title'].map(row).join('');
+  const customRows = ['last_demo_date','lead_score','churn_risk'].map(row).join('');
+  return `
+    <table class="maptbl">
+      <thead>
+        <tr>
+          <th>Harmony field</th>
+          <th>${crmName} source</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="sec-row"><td colspan="2">Standard</td></tr>
+        ${standardRows}
+        <tr class="sec-row"><td colspan="2">Custom</td></tr>
+        ${customRows}
+      </tbody>
+    </table>`;
+}
+
+function syncCard(crm){
+  const on = state.syncEnabled[crm];
+  const name = crm === 'hubspot' ? 'HubSpot' : 'Salesforce';
+  const tool = crm === 'hubspot' ? 'workflow' : 'Flow';
+  const subOn = `Harmony pulls all ${name} contacts. <strong>Account-level <a onclick="goEnrollments()">Enrollments</a></strong> decide who gets called and by which agent.`;
+  const subOff = `Harmony only receives contacts that a ${name} ${tool} explicitly enrolls via the <code class="k">Harmony: Enroll in agent</code> action.`;
+  return `
+    <div class="sync-card">
+      <div class="grow">
+        <div class="sync-title">Sync contacts from ${name}</div>
+        <div class="sync-body">${on ? subOn : subOff}</div>
+        ${on ? `<div class="sync-meta"><span class="live-dot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent)"></span> Synced 12 min ago · 8,412 contacts · 47 added today</div>` : ''}
+      </div>
+      <div class="switch ${on?'on':''}" onclick="toggleSync('${crm}')"></div>
+    </div>
+  `;
+}
+
+function viewHubSpotConfig(){
+  const sync = state.syncEnabled.hubspot;
+  const installed = state.workflowInstalled.hubspot;
+  const mappingDone = unmappedRequired('hubspot').length === 0;
+  return `
+    <div class="int-hdr">
+      <div class="int-hdr-ico" style="background:var(--hubspot)">H</div>
+      <div>
+        <div class="int-hdr-title">HubSpot</div>
+        <div class="int-hdr-meta">
+          <span class="pill pill-ok"><span class="dot"></span>Connected</span>
+          <span style="color:var(--text-3)">·</span>
+          <span>acme.hubspot.com</span>
+        </div>
+      </div>
+    </div>
+
+    ${syncCard('hubspot')}
+
+    <div class="card" style="margin-bottom:24px">
+      <div class="card-pad">
+        <div class="chk-row">
+          <div class="chk-bullet done">✓</div>
+          <div>
+            <div class="chk-title">Harmony app installed in HubSpot</div>
+            <div class="chk-body">Workflow actions available in your workflow builder.</div>
+          </div>
+        </div>
+        <div class="chk-row">
+          <div class="chk-bullet ${mappingDone?'done':'todo'}">${mappingDone?'✓':'2'}</div>
+          <div style="flex:1">
+            <div class="chk-title">Set up field mappings</div>
+            <div class="chk-body">Match Harmony fields to HubSpot properties. Mapped fields are available for ${sync?'enrollment rules and agents':'agents at call time'}.</div>
+            <div class="chk-actions">
+              <button class="btn btn-outline btn-sm" onclick="document.getElementById('mappings').scrollIntoView({behavior:'smooth',block:'start'})">Configure mappings ↓</button>
+            </div>
+          </div>
+        </div>
+        ${sync ? `
+        <div class="chk-row">
+          <div class="chk-bullet ${state.enrollments.length?'done':'todo'}">${state.enrollments.length?'✓':'3'}</div>
+          <div style="flex:1">
+            <div class="chk-title">Define who Harmony should call</div>
+            <div class="chk-body">Enrollments are account-level — set them once and they apply to every synced source.</div>
+            <div class="chk-actions">
+              <button class="btn btn-outline btn-sm" onclick="goEnrollments()">Manage enrollments →</button>
+            </div>
+          </div>
+        </div>
+        ` : `
+        <div class="chk-row">
+          <div class="chk-bullet ${installed?'done':'todo'}">${installed?'✓':'3'}</div>
+          <div style="flex:1">
+            <div class="chk-title">Build a workflow that enrolls contacts into a Harmony agent</div>
+            <div class="chk-body">Add the <code class="k">Harmony: Enroll in agent</code> action at the end of a contact-based workflow.</div>
+            <div class="chk-actions">
+              <button class="btn btn-outline btn-sm">Open HubSpot workflows ↗</button>
+              ${!installed?`<button class="btn btn-primary btn-sm" onclick="installWorkflow('hubspot')">Mark as set up</button>`:''}
+            </div>
+          </div>
+        </div>
+        ${!installed ? `
+        <div class="banner banner-warn" style="margin-top:14px;margin-bottom:0">
+          <div class="b-ico">!</div>
+          <div>Awaiting first contact from HubSpot.</div>
+        </div>` : ''}
+        `}
+      </div>
+    </div>
+
+    <div class="sec" id="mappings">
+      <div class="sec-h">
+        <div class="sec-h-title">Field mappings</div>
+        <button class="btn btn-outline btn-sm" onclick="toast('Generating mappings…')">✨ Generate with AI</button>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden">
+        ${crmMappingTable('hubspot')}
+      </div>
+    </div>
+  `;
+}
+
+function viewSalesforceConfig(){
+  const sync = state.syncEnabled.salesforce;
+  const installed = state.workflowInstalled.salesforce;
+  const mappingDone = unmappedRequired('salesforce').length === 0;
+  return `
+    <div class="int-hdr">
+      <div class="int-hdr-ico" style="background:var(--salesforce)">S</div>
+      <div>
+        <div class="int-hdr-title">Salesforce</div>
+        <div class="int-hdr-meta">
+          <span class="pill pill-ok"><span class="dot"></span>Connected</span>
+          <span style="color:var(--text-3)">·</span>
+          <span>acme.my.salesforce.com</span>
+        </div>
+      </div>
+    </div>
+
+    ${syncCard('salesforce')}
+
+    <div class="card" style="margin-bottom:24px">
+      <div class="card-pad">
+        <div class="chk-row">
+          <div class="chk-bullet done">✓</div>
+          <div>
+            <div class="chk-title">Harmony connected app installed</div>
+            <div class="chk-body">Invocable action available in Flow Builder.</div>
+          </div>
+        </div>
+        <div class="chk-row">
+          <div class="chk-bullet ${mappingDone?'done':'todo'}">${mappingDone?'✓':'2'}</div>
+          <div style="flex:1">
+            <div class="chk-title">Set up field mappings</div>
+            <div class="chk-body">Match Harmony fields to Salesforce fields. Mapped fields are available for ${sync?'enrollment rules and agents':'agents at call time'}.</div>
+            <div class="chk-actions">
+              <button class="btn btn-outline btn-sm" onclick="document.getElementById('mappings').scrollIntoView({behavior:'smooth',block:'start'})">Configure mappings ↓</button>
+            </div>
+          </div>
+        </div>
+        ${sync ? `
+        <div class="chk-row">
+          <div class="chk-bullet ${state.enrollments.length?'done':'todo'}">${state.enrollments.length?'✓':'3'}</div>
+          <div style="flex:1">
+            <div class="chk-title">Define who Harmony should call</div>
+            <div class="chk-body">Enrollments are account-level — set them once and they apply to every synced source.</div>
+            <div class="chk-actions">
+              <button class="btn btn-outline btn-sm" onclick="goEnrollments()">Manage enrollments →</button>
+            </div>
+          </div>
+        </div>
+        ` : `
+        <div class="chk-row">
+          <div class="chk-bullet ${installed?'done':'todo'}">${installed?'✓':'3'}</div>
+          <div style="flex:1">
+            <div class="chk-title">Build a Flow that enrolls records into a Harmony agent</div>
+            <div class="chk-body">Add the <code class="k">Harmony: Enroll in agent</code> invocable action to a record-triggered Flow.</div>
+            <div class="chk-actions">
+              <button class="btn btn-outline btn-sm">Open Salesforce setup ↗</button>
+              ${!installed?`<button class="btn btn-primary btn-sm" onclick="installWorkflow('salesforce')">Mark as set up</button>`:''}
+            </div>
+          </div>
+        </div>
+        ${!installed ? `
+        <div class="banner banner-warn" style="margin-top:14px;margin-bottom:0">
+          <div class="b-ico">!</div>
+          <div>Awaiting first contact from Salesforce.</div>
+        </div>` : ''}
+        `}
+      </div>
+    </div>
+
+    <div class="sec" id="mappings">
+      <div class="sec-h">
+        <div class="sec-h-title">Field mappings</div>
+        <button class="btn btn-outline btn-sm" onclick="toast('Generating mappings…')">✨ Generate with AI</button>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden">
+        ${crmMappingTable('salesforce')}
+      </div>
+    </div>
+  `;
+}
+
+/* ============================================================
+   ENROLLMENTS — list
+============================================================ */
+function viewEnrollments(){
+  const synced = syncedCRMs();
+  const workflowOnly = connectedCRMs().filter(c => !state.syncEnabled[c]);
+  let banner = '';
+  if(synced.length === 0 && connectedCRMs().length > 0){
+    banner = `
+      <div class="banner banner-warn">
+        <div class="b-ico">!</div>
+        <div>No CRM is in sync mode, so enrollments aren't active. Workflow-driven contacts are enrolled by the CRM workflow itself.</div>
+      </div>`;
+  } else if(workflowOnly.length > 0){
+    const names = workflowOnly.map(c => c === 'hubspot' ? 'HubSpot' : 'Salesforce').join(', ');
+    banner = `
+      <div class="banner banner-info">
+        <div class="b-ico">i</div>
+        <div>Enrollments apply to <strong>synced</strong> contacts (${synced.map(c => c==='hubspot'?'HubSpot':'Salesforce').join(', ') || 'none'}). Contacts arriving via ${names} workflow are enrolled by that workflow.</div>
+      </div>`;
+  }
+
+  if(state.enrollments.length === 0){
+    return `
+      <div class="page-title" style="margin-bottom:6px">Enrollments</div>
+      <div class="page-sub">Decide who Harmony calls and which agent handles them. Rules use the Harmony fields you've mapped from each source.</div>
+      ${banner}
+      <div class="empty">
+        <div class="empty-ico">⇲</div>
+        <div class="empty-title">No enrollments yet</div>
+        <div class="empty-body">Create an enrollment to start calling synced contacts. Without one, contacts sit in Harmony but Harmony won't reach out.</div>
+        <button class="btn btn-primary" onclick="goEnrollmentNew()">+ New enrollment</button>
+      </div>
+    `;
+  }
+
+  const rows = state.enrollments.map(e => {
+    const chips = e.enrollCriteria.slice(0,3).map(c => `
+      <span class="crit-chip">
+        <span class="var">${ATTR_DEFS[c.field]?.label || c.field}</span>
+        <span class="op">${opLabel(c.field, c.op)}</span>
+        ${opNeedsValue(c.op) ? `<span>${c.value || '—'}</span>` : ''}
+      </span>`).join('');
+    const more = e.enrollCriteria.length > 3 ? `<span class="crit-chip" style="background:transparent;border-style:dashed">+${e.enrollCriteria.length - 3} more</span>` : '';
+    return `
+      <div class="enroll-row" onclick="goEnrollmentEdit('${e.id}')">
+        <div style="flex:1;min-width:0">
+          <div class="enroll-name">${e.name}</div>
+          <div class="enroll-meta">
+            <span>→ ${e.agent}</span>
+            <span style="color:var(--text-3)">·</span>
+            <span class="src-mini">from
+              ${(e.sources && e.sources.length ? e.sources : ['—']).map(s => {
+                const m = SOURCE_META[s];
+                return m ? `<span class="ico-sq" style="background:${m.bg}">${m.letter}</span>${m.name}` : '<span>—</span>';
+              }).join(' <span style="color:var(--text-3)">+</span> ')}
+            </span>
+            <span style="color:var(--text-3)">·</span>
+            <span>${e.enrollCriteria.length} enroll · ${e.unenrollCriteria.length} unenroll</span>
+            ${e.allowReenroll ? `<span style="color:var(--text-3)">·</span><span>re-enroll after ${e.cooldownDays}d</span>` : ''}
+          </div>
+          <div class="crit-list" style="margin-top:10px">${chips}${more}</div>
+        </div>
+        <div class="enroll-right">
+          <div class="enroll-count">
+            <div class="n">${e.enrolled}</div>
+            <div>enrolled</div>
+          </div>
+          <span class="pill ${e.enabled?'pill-ok':'pill-mute'}">${e.enabled?'<span class="dot"></span>Active':'Paused'}</span>
+          <div class="switch ${e.enabled?'on':''}" onclick="event.stopPropagation();toggleEnrollmentEnabled('${e.id}')"></div>
+        </div>
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="page-title" style="margin-bottom:6px">Enrollments</div>
+    <div class="page-sub">Decide who Harmony calls and which agent handles them. Rules use the Harmony fields you've mapped from each source.</div>
+    ${banner}
+    <div class="card" style="padding:0">${rows}</div>
+  `;
+}
+
+/* ============================================================
+   ENROLLMENTS — editor
+============================================================ */
+function critRule(kind, idx, c){
+  const type = ATTR_DEFS[c.field]?.type || 'string';
+  const ops = OPS[type];
+  const fieldOpts = ALL_ATTRS.map(a => {
+    const mapped = fieldMappedSomewhere(a);
+    return `<option value="${a}" ${a===c.field?'selected':''}>${ATTR_DEFS[a].label}${mapped?'':' (not mapped)'}</option>`;
+  }).join('');
+  const opOpts = ops.map(o => `<option value="${o.k}" ${o.k===c.op?'selected':''}>${o.label}</option>`).join('');
+  const valInput = opNeedsValue(c.op)
+    ? `<input class="val" type="${type==='number'?'number':type==='date'?(c.op==='within_days'?'number':'date'):'text'}" placeholder="Value" value="${c.value||''}" oninput="updateCrit('${kind}',${idx},{value:this.value})"/>`
+    : `<div style="flex:1"></div>`;
+  return `
+    <div class="crit-rule">
+      <select class="sel" onchange="updateCrit('${kind}',${idx},{field:this.value})">${fieldOpts}</select>
+      <select class="sel" onchange="updateCrit('${kind}',${idx},{op:this.value})">${opOpts}</select>
+      ${valInput}
+      <div class="rm" title="Remove" onclick="rmCrit('${kind}',${idx})">×</div>
+    </div>`;
+}
+
+function viewEnrollmentEdit(){
+  const d = state._draft;
+  if(!d) return `<div class="empty"><div class="empty-title">Not found</div><button class="btn btn-outline" onclick="goEnrollments()">Back</button></div>`;
+  const isNew = state.editingEnrollmentId === 'new';
+
+  const enrollRules = d.enrollCriteria.map((c,i) => critRule('enroll', i, c)).join('') ||
+    `<div class="muted" style="font-size:12.5px;padding:6px 0">No conditions yet. A contact must match all conditions you add to be enrolled.</div>`;
+  const unenrollRules = d.unenrollCriteria.map((c,i) => critRule('unenroll', i, c)).join('') ||
+    `<div class="muted" style="font-size:12.5px;padding:6px 0">No conditions yet. Optional — if empty, contacts stay enrolled until they're called.</div>`;
+
+  return `
+    <div class="page-title" style="margin-bottom:20px">${isNew?'New enrollment':'Edit enrollment'}</div>
+
+    <div class="card">
+      <div class="card-pad">
+        <div class="field-row">
+          <div class="lbl">Name<div class="sub">Shown in lists</div></div>
+          <div class="grow"><input class="txt" placeholder="e.g. Senior buyers — Q2 outbound" value="${d.name}" oninput="draftUpdate({name:this.value})"/></div>
+        </div>
+        <div class="field-row">
+          <div class="lbl">Agent<div class="sub">Who handles the call</div></div>
+          <div class="grow"><select class="sel" onchange="draftUpdate({agent:this.value})">${AGENTS.map(a => `<option ${a===d.agent?'selected':''}>${a}</option>`).join('')}</select></div>
+        </div>
+        <div class="field-row" style="border-bottom:none">
+          <div class="lbl">Contact source<div class="sub">Synced CRMs to enroll from</div></div>
+          <div class="grow">
+            <div class="src-pills">
+              ${sourcePillsFor(d.sources, 'toggleEnrollmentSource')}
+              <div class="src-pill add" onclick="openAddMenu(event)">+ Connect new source</div>
+            </div>
+            ${connectedCRMs().filter(c => !state.syncEnabled[c]).length ? `<div class="muted" style="font-size:11.5px;margin-top:8px">Only synced sources can power enrollments. Workflow-mode sources won't appear here.</div>` : ''}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hd">
+        <div>
+          <div class="card-hd-title">Enrollment criteria</div>
+          <div class="card-hd-sub">All conditions must match (AND). Contacts who match are enrolled in <strong>${d.agent}</strong>.</div>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="addCrit('enroll')">+ Add condition</button>
+      </div>
+      <div class="card-pad" style="padding-top:6px;padding-bottom:14px">${enrollRules}</div>
+    </div>
+
+    <div class="card">
+      <div class="card-hd">
+        <div>
+          <div class="card-hd-title">Unenrollment criteria</div>
+          <div class="card-hd-sub">Any matching condition removes a contact from this enrollment.</div>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="addCrit('unenroll')">+ Add condition</button>
+      </div>
+      <div class="card-pad" style="padding-top:6px;padding-bottom:14px">${unenrollRules}</div>
+    </div>
+
+    <div class="card">
+      <div class="card-pad">
+        <div class="tog-row" style="padding-top:4px">
+          <div class="grow">
+            <div class="tog-title">Allow re-enrollment</div>
+            <div class="tog-sub">If a contact gets unenrolled and later matches again, re-enroll them after a cooldown.</div>
+          </div>
+          <div class="switch ${d.allowReenroll?'on':''}" onclick="draftUpdate({allowReenroll:!draft().allowReenroll})"></div>
+        </div>
+        ${d.allowReenroll ? `
+        <div class="field-row" style="border-bottom:none">
+          <div class="lbl">Cooldown<div class="sub">Days before re-enrollment</div></div>
+          <div class="grow" style="max-width:140px"><input class="txt" type="number" min="1" value="${d.cooldownDays}" oninput="draftUpdate({cooldownDays:Number(this.value)||1})"/></div>
+        </div>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+/* ============================================================
+   MODAL (OAuth)
+============================================================ */
+function renderModal(){
+  const root = $('modal-root');
+  if(!state.modal){ root.innerHTML = ''; return; }
+  const crm = state.modal === 'oauth-hubspot' ? 'hubspot' : 'salesforce';
+  const meta = crm === 'hubspot'
+    ? { name:'HubSpot', host:'app.hubspot.com', acct:'acme.hubspot.com', bg:'var(--hubspot)', letter:'H',
+        scopes: ['View contacts and their properties','Create and update contact properties','Log engagements and timeline events','Install custom workflow actions'] }
+    : { name:'Salesforce', host:'login.salesforce.com', acct:'acme.my.salesforce.com', bg:'var(--salesforce)', letter:'S',
+        scopes: ['View leads, contacts, and accounts','Read & update standard and custom fields','Create Tasks and Platform Events','Install Flow invocable actions'] };
+  root.innerHTML = `
+    <div class="modal-bg" onclick="if(event.target===this)cancelOAuth()">
+      <div class="modal">
+        <div class="modal-hd">🔒 ${meta.host}/oauth/authorize</div>
+        <div class="modal-bd">
+          <div class="oauth-logos">
+            <div class="oauth-logo h">H</div>
+            <div class="oauth-arrow">⟷</div>
+            <div class="oauth-logo" style="background:${meta.bg}">${meta.letter}</div>
+          </div>
+          <div class="oauth-title">Harmony is requesting access to your ${meta.name} account</div>
+          <div class="oauth-sub">Harmony will read records and write activities. You can revoke access any time from ${meta.name} Settings.</div>
+          <div class="oauth-acct">
+            <div>Connecting: <strong>${meta.acct}</strong></div>
+            <div class="muted" style="cursor:pointer">Switch ▾</div>
+          </div>
+          <div class="oauth-scopes-h">Harmony will be able to:</div>
+          ${meta.scopes.map(s => `<div class="oauth-scope"><span class="ck">✓</span><span>${s}</span></div>`).join('')}
+        </div>
+        <div class="modal-ft">
+          <button class="btn btn-ghost" onclick="cancelOAuth()">Cancel</button>
+          <button class="btn" style="background:${meta.bg};color:#fff" onclick="grantOAuth()">Connect app</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ============================================================
+   MAIN RENDER
+============================================================ */
+function render(){
+  $('sidebar').innerHTML = renderSidebar();
+  $('topbar').innerHTML = renderTopbar();
+  document.querySelectorAll('.rail-item').forEach(r => r.classList.remove('on'));
+  if(state.view === 'contacts') $('rail-contacts').classList.add('on');
+  else $('rail-settings').classList.add('on');
+  let v;
+  switch(state.view){
+    case 'contacts': v = viewContacts(); break;
+    case 'integrations': v = viewIntegrations(); break;
+    case 'fields': v = viewFields(); break;
+    case 'enrollments': v = viewEnrollments(); break;
+    case 'enrollment-edit': v = viewEnrollmentEdit(); break;
+    case 'hubspot-pre': v = viewHubSpotPre(); break;
+    case 'hubspot-config': v = viewHubSpotConfig(); break;
+    case 'salesforce-pre': v = viewSalesforcePre(); break;
+    case 'salesforce-config': v = viewSalesforceConfig(); break;
+    default: v = viewContacts();
+  }
+  $('view').innerHTML = v;
+  renderModal();
+  renderPopover();
+}
+
+render();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Harmony — Book a meeting node (fast path)</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0b0b14;min-height:100vh;display:flex;flex-direction:column;color:#e0e0f0}
+
+/* Top nav */
+.topbar{background:#0b0b14;padding:10px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #181828;flex-shrink:0}
+.logo{display:flex;align-items:center;gap:6px}
+.logo-box{width:20px;height:20px;border-radius:5px;background:linear-gradient(135deg,#7c5cfc,#5c9cfc);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:#fff}
+.logo-text{font-size:13px;font-weight:700;color:#e0e0f0}
+.step-nav{display:flex;align-items:center;gap:10px}
+.step-dots{display:flex;gap:5px}
+.sdot{width:7px;height:7px;border-radius:50%;background:#222232;cursor:pointer;transition:background .2s}
+.sdot.active{background:#7c5cfc;box-shadow:0 0 5px #7c5cfc88}
+.sdot.done{background:#2a6e4a}
+.btn-nav{background:#181828;border:1px solid #252540;color:#888;padding:5px 13px;border-radius:6px;font-size:12px;cursor:pointer}
+.btn-nav:hover:not(:disabled){background:#1e1e2e;color:#ddd}
+.btn-nav:disabled{opacity:.28;cursor:default}
+.step-lbl{font-size:11px;color:#555;min-width:240px;text-align:center}
+.step-lbl strong{color:#9988dd}
+
+.screen{flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative}
+
+/* Harmony chrome */
+.h-chrome{flex:1;display:flex;flex-direction:column;background:#12121e;overflow:hidden}
+.h-topbar{background:#181828;border-bottom:1px solid #222238;padding:0 14px;display:flex;align-items:center;height:38px;flex-shrink:0}
+.h-topbar-logo{display:flex;align-items:center;gap:6px;padding-right:14px;border-right:1px solid #222238;margin-right:8px;height:100%}
+.h-topbar-tab{padding:10px 12px;font-size:12px;color:#666;cursor:pointer;border-bottom:2px solid transparent;font-weight:600}
+.h-topbar-tab.on{color:#e0e0f0;border-bottom-color:#7c5cfc}
+
+.h-layout{flex:1;display:grid;grid-template-columns:220px 1fr;overflow:hidden;position:relative}
+.h-sidebar{background:#181828;border-right:1px solid #222238;padding:8px 0;overflow-y:auto}
+.h-sidebar-section{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#444;padding:12px 14px 4px}
+.h-sidebar-item{padding:6px 14px;font-size:12px;color:#666;cursor:pointer;border-left:2px solid transparent;font-weight:600}
+.h-sidebar-item:hover{color:#aaa}
+.h-sidebar-item.on{color:#ddd;border-left-color:#7c5cfc;background:#1c1c2e}
+
+.h-main{position:relative;overflow:hidden;display:flex;flex-direction:column;background:#0e0e18}
+
+/* Agent header strip */
+.agent-strip{padding:14px 22px;border-bottom:1px solid #222238;display:flex;align-items:center;justify-content:space-between;background:#12121e;flex-shrink:0}
+.agent-strip-l{display:flex;align-items:center;gap:11px}
+.agent-strip-title{font-size:14px;font-weight:800;color:#e0e0f0}
+.agent-strip-meta{font-size:11px;color:#666;margin-top:1px}
+.agent-tabs{display:flex;gap:0}
+.agent-tab{padding:5px 12px;font-size:11px;color:#666;cursor:pointer;border-bottom:2px solid transparent;font-weight:600}
+.agent-tab.on{color:#e0e0f0;border-bottom-color:#7c5cfc}
+
+/* Flowchart canvas */
+.canvas{flex:1;position:relative;overflow:auto;background:
+  radial-gradient(circle at 20px 20px,#1c1c2e 1px,transparent 1px) 0 0/22px 22px,
+  #0e0e18}
+.canvas-inner{position:relative;width:100%;min-height:100%;padding:36px;display:flex;flex-direction:column;align-items:center;gap:0}
+
+/* Flowchart nodes */
+.fc-node{background:#181828;border:1px solid #2e2e42;border-radius:9px;padding:10px 14px;min-width:200px;cursor:pointer;transition:all .12s;position:relative;z-index:2}
+.fc-node:hover{border-color:#555}
+.fc-node.selected{border-color:#7c5cfc;box-shadow:0 0 0 3px #7c5cfc22}
+.fc-node.book{border-color:#7c5cfc55;background:linear-gradient(180deg,#1c1828,#181828);min-width:240px}
+.fc-node.book.unconfigured{border-style:dashed;border-color:#444}
+.fc-node.book.configured{border-color:#7c5cfc77}
+.fc-node-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#666;margin-bottom:3px;display:flex;align-items:center;gap:5px}
+.fc-node-lbl .dot{width:6px;height:6px;border-radius:50%;background:#7c5cfc}
+.fc-node-lbl.book .dot{background:#7c5cfc}
+.fc-node-title{font-size:13px;font-weight:700;color:#ddd}
+.fc-node-sub{font-size:11px;color:#666;margin-top:3px;line-height:1.5}
+.fc-node-sub.warn{color:#cc8800}
+
+.fc-connector{width:1px;height:24px;background:#2e2e42;margin:0 auto}
+.fc-branch-wrap{display:flex;gap:22px;justify-content:center;align-items:flex-start;position:relative;padding-top:20px}
+.fc-branch-wrap::before{content:'';position:absolute;top:0;left:25%;right:25%;height:1px;background:#2e2e42}
+.fc-branch-wrap::after{content:'';position:absolute;top:0;left:50%;width:1px;height:20px;background:#2e2e42;transform:translateX(-0.5px)}
+.fc-branch{display:flex;flex-direction:column;align-items:center}
+.fc-branch::before{content:'';width:1px;height:20px;background:#2e2e42;margin-bottom:0}
+.fc-branch-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#7c5cfc;margin-bottom:5px;padding:2px 7px;background:#1c1c2e;border-radius:3px;border:1px solid #7c5cfc33}
+.fc-branch-label.warn{color:#cc8800;border-color:#cc880033}
+.fc-branch-label.err{color:#c0392b;border-color:#c0392b33}
+
+/* Output ports preview on node */
+.fc-ports{display:flex;justify-content:space-around;margin-top:10px;padding-top:9px;border-top:1px dashed #2e2e42}
+.fc-port{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#666;display:flex;align-items:center;gap:4px}
+.fc-port .pdot{width:7px;height:7px;border-radius:50%;background:#666}
+.fc-port.ok .pdot{background:#3ecf8e}
+.fc-port.warn .pdot{background:#cc8800}
+.fc-port.err .pdot{background:#c0392b}
+
+/* Side panel */
+.side-panel{position:absolute;top:0;right:0;bottom:0;width:440px;background:#12121e;border-left:1px solid #222238;display:flex;flex-direction:column;box-shadow:-10px 0 30px rgba(0,0,0,.35);z-index:50}
+.sp-header{padding:14px 18px;border-bottom:1px solid #222238;display:flex;justify-content:space-between;align-items:flex-start;flex-shrink:0}
+.sp-title{font-size:13px;font-weight:800;color:#e0e0f0;display:flex;align-items:center;gap:8px}
+.sp-title .pip{width:8px;height:8px;border-radius:50%;background:#7c5cfc}
+.sp-sub{font-size:11px;color:#666;margin-top:3px}
+.sp-close{font-size:16px;color:#555;cursor:pointer;padding:2px 6px;border-radius:4px}
+.sp-close:hover{color:#aaa;background:#1c1c2e}
+.sp-body{flex:1;overflow-y:auto;padding:14px 18px}
+.sp-footer{border-top:1px solid #222238;padding:11px 18px;display:flex;justify-content:flex-end;gap:8px;flex-shrink:0}
+
+/* Sections inside panel */
+.sec{margin-bottom:18px}
+.sec-hd{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#888;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+.sec-hd .sec-aux{font-size:10px;color:#555;text-transform:none;font-weight:500;letter-spacing:0}
+
+/* Dynamic select */
+.dyn-select{background:#13131f;border:1px solid #2e2e42;border-radius:6px;padding:9px 11px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;gap:8px;font-size:12px}
+.dyn-select:hover{border-color:#555}
+.dyn-select-l{display:flex;align-items:center;gap:9px;flex:1;min-width:0}
+.dyn-icon{width:20px;height:20px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:#fff;flex-shrink:0}
+.dyn-text{font-size:12px;color:#ccc;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dyn-text.placeholder{color:#555;font-weight:500;font-style:italic}
+.dyn-arrow{color:#555;font-size:10px}
+.dyn-mode{display:inline-flex;align-items:center;gap:3px;background:#1c1c2e;border:1px solid #2e2e42;border-radius:4px;padding:2px 7px;font-size:10px;color:#888;font-weight:600}
+.dyn-mode.active{color:#9977dd;border-color:#7c5cfc55;background:#22183e}
+
+/* Mode toggle */
+.mode-tabs{display:flex;gap:0;background:#13131f;border:1px solid #252540;border-radius:6px;padding:3px;margin-bottom:9px}
+.mode-tab{flex:1;text-align:center;font-size:11px;padding:5px 10px;color:#666;cursor:pointer;border-radius:4px;font-weight:600}
+.mode-tab.on{background:#22183e;color:#9977dd}
+
+/* Empty-state card for picker */
+.empty-pick{background:#13131f;border:1px dashed #2e2e42;border-radius:8px;padding:14px;text-align:center}
+.empty-pick-title{font-size:12px;font-weight:700;color:#ccc;margin-bottom:5px}
+.empty-pick-sub{font-size:11px;color:#666;margin-bottom:10px;line-height:1.5}
+
+/* Provider list */
+.provider-list{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.provider{background:#181828;border:1px solid #2e2e42;border-radius:7px;padding:9px 11px;display:flex;align-items:center;gap:9px;cursor:pointer;transition:all .12s}
+.provider:hover{border-color:#7c5cfc55;background:#1c1828}
+.provider.selected{border-color:#7c5cfc;background:#22183e}
+.provider-icon{width:22px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:#fff;flex-shrink:0}
+.provider-name{font-size:12px;font-weight:600;color:#ddd}
+
+/* Mapping table */
+.map-table{width:100%;border-collapse:collapse;font-size:12px}
+.map-table td{padding:6px 0;vertical-align:middle}
+.var-chip{display:inline-block;background:#13131f;border:1px solid #2e2e42;border-radius:4px;padding:3px 8px;font-size:11px;color:#9977dd;font-family:monospace;font-weight:600}
+.scheduler-field{font-size:12px;color:#ccc;font-weight:600}
+.field-required{color:#7c5cfc;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-left:5px}
+
+/* Output vars list */
+.outputs-grid{background:#13131f;border:1px solid #252540;border-radius:6px;padding:9px 11px}
+.output-row{display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid #1e1e2e;font-size:11px}
+.output-row:last-child{border-bottom:none}
+.output-row .var-chip{font-size:10px}
+.output-row .desc{color:#666;font-size:11px}
+
+/* Exit edges preview */
+.edges-list{display:flex;flex-direction:column;gap:7px}
+.edge-row{display:flex;align-items:center;gap:9px;font-size:11px;color:#999;background:#13131f;border:1px solid #252540;border-radius:6px;padding:8px 11px}
+.edge-row .pdot{width:8px;height:8px;border-radius:50%}
+.edge-row.ok .pdot{background:#3ecf8e}
+.edge-row.warn .pdot{background:#cc8800}
+.edge-row.err .pdot{background:#c0392b}
+.edge-row .edge-name{flex:1;font-weight:600;color:#ddd}
+.edge-row .edge-target{font-size:10px;color:#666}
+
+/* Buttons */
+.btn{padding:6px 13px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;border:none;transition:all .15s}
+.btn.primary{background:linear-gradient(135deg,#7c5cfc,#5c9cfc);color:#fff}
+.btn.primary:hover{filter:brightness(1.1)}
+.btn.ghost{background:#1c1c2e;border:1px solid #2e2e42;color:#aaa}
+.btn.ghost:hover{color:#ddd;border-color:#555}
+.btn.ghost-sm{background:transparent;border:1px solid #2e2e42;color:#888;padding:4px 10px;font-size:11px;border-radius:5px;font-weight:600;cursor:pointer}
+.btn.ghost-sm:hover{color:#ccc;border-color:#555}
+
+/* Banner */
+.banner{background:#13131f;border:1px solid #252540;border-radius:7px;padding:10px 12px;font-size:11px;color:#888;line-height:1.6;display:flex;gap:9px}
+.banner .bi{color:#9977dd;font-style:italic;font-family:Georgia,serif;font-weight:700;font-size:12px;flex-shrink:0;margin-top:1px}
+.banner.warn{border-color:#cc880033;background:#1f1a14;color:#cc8800}
+
+/* Connecting state (overlay) */
+.connecting-overlay{position:absolute;inset:0;background:rgba(11,11,20,.85);display:flex;align-items:center;justify-content:center;z-index:100;backdrop-filter:blur(3px)}
+.connecting-card{background:#181828;border:1px solid #2e2e42;border-radius:11px;padding:28px 32px;text-align:center;max-width:340px}
+.connecting-card .ci{width:48px;height:48px;border-radius:11px;background:#006bff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;color:#fff;margin:0 auto 14px}
+.connecting-card h3{font-size:14px;font-weight:800;color:#e0e0f0;margin-bottom:5px}
+.connecting-card p{font-size:11px;color:#666;line-height:1.6}
+.spin{display:inline-block;width:13px;height:13px;border:2px solid #2e2e42;border-top-color:#7c5cfc;border-radius:50%;animation:sp 1s linear infinite;margin-right:6px;vertical-align:middle}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* Footer */
+.footer{background:#0b0b14;border-top:1px solid #181828;padding:9px 24px;font-size:11px;color:#666;display:flex;align-items:center;gap:8px;flex-shrink:0}
+.footer-num{background:#7c5cfc;color:#fff;width:17px;height:17px;border-radius:50%;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+.fade{animation:fi .25s ease}
+@keyframes fi{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
+.slide-in{animation:si .25s ease}
+@keyframes si{from{transform:translateX(20px);opacity:0}to{transform:translateX(0);opacity:1}}
+
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:#252540;border-radius:2px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo"><div class="logo-box">H</div><div class="logo-text">Harmony</div></div>
+  <div class="step-nav">
+    <button class="btn-nav" id="btn-prev" onclick="go(-1)">← Prev</button>
+    <div class="step-dots" id="dots"></div>
+    <div class="step-lbl" id="step-lbl"></div>
+    <button class="btn-nav" id="btn-next" onclick="go(1)">Next →</button>
+  </div>
+</div>
+
+<div class="screen" id="screen"></div>
+
+<div class="footer">
+  <div class="footer-num" id="footer-num">1</div>
+  <div id="footer-text"></div>
+</div>
+
+<script>
+const STEPS = [
+  {label:'Flowchart · unconfigured Book-meeting node',
+   footer:'Agent flowchart. The Book-a-meeting node has been dropped but isn\'t configured yet. Click it to open the config panel.',
+   render:s1},
+  {label:'Node panel · no scheduler connected',
+   footer:'Side panel opens. Scheduler picker shows the empty state — no schedulers connected yet. User clicks "Connect a scheduler" instead of going to Settings.',
+   render:s2},
+  {label:'Provider picker · pick Calendly',
+   footer:'Provider list appears inline. User picks Calendly — kicks off OAuth in a new tab. This is the fast path: connection happens here, not in Settings.',
+   render:s3},
+  {label:'Configured · static scheduler',
+   footer:'OAuth complete. The picker now lists event types from the connected Calendly account. User picked "Demo — 30 min." Field mapping reveals with defaults pulled from the agent\'s contact source.',
+   render:s4},
+  {label:'Configured · variable scheduler',
+   footer:'User switched to Variable mode — scheduler ID resolves at runtime from a CRM field (e.g. the contact\'s owner Calendly link). Field mapping collapses to the generic invitee shape since the form schema isn\'t known at config time.',
+   render:s5},
+  {label:'Flowchart · node configured',
+   footer:'Back on the canvas. The node shows the scheduler + two exit ports: Booked → Confirm, Not booked → Send follow-up email. Power users can branch on {{schedule_demo.failure_reason}} downstream if they need granular routing.',
+   render:s6},
+];
+
+let step = 0;
+function go(d){ setStep(step+d); }
+function setStep(n){ if(n<0||n>=STEPS.length) return; step=n; render(); }
+function render(){
+  document.getElementById('dots').innerHTML = STEPS.map((_,i)=>{
+    const c='sdot'+(i===step?' active':i<step?' done':'');
+    return `<div class="${c}" onclick="setStep(${i})"></div>`;
+  }).join('');
+  document.getElementById('step-lbl').innerHTML = `<strong>${step+1}/${STEPS.length}</strong> — ${STEPS[step].label}`;
+  document.getElementById('btn-prev').disabled = step===0;
+  document.getElementById('btn-next').disabled = step===STEPS.length-1;
+  document.getElementById('footer-num').textContent = step+1;
+  document.getElementById('footer-text').textContent = STEPS[step].footer;
+  document.getElementById('screen').innerHTML = STEPS[step].render();
+}
+
+/* ── Chrome ── */
+function chrome(body){
+  return `
+    <div class="h-chrome fade">
+      <div class="h-topbar">
+        <div class="h-topbar-logo">
+          <div class="logo-box" style="width:18px;height:18px;font-size:8px;border-radius:4px">H</div>
+          <span style="font-size:12px;font-weight:700;color:#ddd">Harmony</span>
+        </div>
+        <div class="h-topbar-tab on">Agents</div>
+        <div class="h-topbar-tab">Conversations</div>
+        <div class="h-topbar-tab">Contacts</div>
+        <div class="h-topbar-tab">Settings</div>
+      </div>
+      <div class="h-layout">
+        <div class="h-sidebar">
+          <div class="h-sidebar-section">Agents</div>
+          <div class="h-sidebar-item on">Q2 Outreach — Decision Makers</div>
+          <div class="h-sidebar-item">Inbound Follow-up</div>
+          <div class="h-sidebar-item">Re-engagement</div>
+        </div>
+        <div class="h-main">
+          <div class="agent-strip">
+            <div class="agent-strip-l">
+              <div>
+                <div class="agent-strip-title">Q2 Outreach — Decision Makers</div>
+                <div class="agent-strip-meta">Outbound · Aria voice</div>
+              </div>
+            </div>
+            <div class="agent-tabs">
+              <div class="agent-tab on">Script</div>
+              <div class="agent-tab">Voice &amp; dialer</div>
+              <div class="agent-tab">Enrollments</div>
+              <div class="agent-tab">Activity</div>
+            </div>
+          </div>
+          ${body}
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ── Flowchart renderer ── */
+function flowchart(opts={}){
+  const {selectedNode, bookConfigured=false, branched=false} = opts;
+  const sel = (id) => selectedNode===id ? 'selected' : '';
+
+  const bookNode = bookConfigured
+    ? `<div class="fc-node book configured ${sel('book')}">
+         <div class="fc-node-lbl book"><span class="dot"></span>Book a meeting</div>
+         <div class="fc-node-title">Schedule demo</div>
+         <div class="fc-node-sub" style="display:flex;align-items:center;gap:6px;margin-top:5px">
+           <div class="dyn-icon" style="background:#006bff;width:16px;height:16px;font-size:8px;border-radius:3px">C</div>
+           Calendly · Demo — 30 min
+         </div>
+         <div class="fc-ports">
+           <div class="fc-port ok"><span class="pdot"></span>Booked</div>
+           <div class="fc-port warn"><span class="pdot"></span>Not booked</div>
+         </div>
+       </div>`
+    : `<div class="fc-node book unconfigured ${sel('book')}" onclick="setStep(1)">
+         <div class="fc-node-lbl book"><span class="dot"></span>Book a meeting</div>
+         <div class="fc-node-title" style="color:#888">New node</div>
+         <div class="fc-node-sub warn">⚠ Not configured · click to set up</div>
+       </div>`;
+
+  const branches = bookConfigured && branched
+    ? `<div class="fc-branch-wrap">
+         <div class="fc-branch">
+           <div class="fc-branch-label">Booked</div>
+           <div class="fc-node">
+             <div class="fc-node-lbl"><span class="dot" style="background:#3ecf8e"></span>Speak</div>
+             <div class="fc-node-title">Confirm + wrap</div>
+           </div>
+         </div>
+         <div class="fc-branch">
+           <div class="fc-branch-label warn">Not booked</div>
+           <div class="fc-node">
+             <div class="fc-node-lbl"><span class="dot" style="background:#cc8800"></span>Action</div>
+             <div class="fc-node-title">Send follow-up email</div>
+             <div class="fc-node-sub" style="font-size:10px">Includes {{schedule_demo.failure_reason}} in template</div>
+           </div>
+         </div>
+       </div>`
+    : '';
+
+  return `
+    <div class="canvas">
+      <div class="canvas-inner">
+        <div class="fc-node">
+          <div class="fc-node-lbl"><span class="dot" style="background:#3ecf8e"></span>Start</div>
+          <div class="fc-node-title">Greeting</div>
+        </div>
+        <div class="fc-connector"></div>
+        <div class="fc-node">
+          <div class="fc-node-lbl"><span class="dot" style="background:#5c9cfc"></span>Speak</div>
+          <div class="fc-node-title">Qualify interest</div>
+          <div class="fc-node-sub">Extract: {{interest_tier}}, {{pain_point}}</div>
+        </div>
+        <div class="fc-connector"></div>
+        ${bookNode}
+        ${branches}
+      </div>
+    </div>`;
+}
+
+/* ── Side panel ── */
+function panel(body){
+  return `
+    <div class="side-panel slide-in">
+      <div class="sp-header">
+        <div>
+          <div class="sp-title"><span class="pip"></span>Book a meeting</div>
+          <div class="sp-sub">"Schedule demo" · ID: node_bk_38a1</div>
+        </div>
+        <div class="sp-close" onclick="setStep(Math.max(0,${step}-1))">✕</div>
+      </div>
+      <div class="sp-body">${body}</div>
+      <div class="sp-footer">
+        <button class="btn ghost">Cancel</button>
+        <button class="btn primary">Save</button>
+      </div>
+    </div>`;
+}
+
+/* ══════════════════════════════════════════
+   Screen 1 — Flowchart, unconfigured
+═══════════════════════════════════════════ */
+function s1(){
+  return chrome(flowchart({selectedNode:'book'}));
+}
+
+/* ══════════════════════════════════════════
+   Screen 2 — Side panel, no scheduler connected
+═══════════════════════════════════════════ */
+function s2(){
+  return chrome(`
+    ${flowchart({selectedNode:'book'})}
+    ${panel(`
+      <div class="sec">
+        <div class="sec-hd">Scheduler</div>
+        <div class="empty-pick">
+          <div class="empty-pick-title">No scheduler connected</div>
+          <div class="empty-pick-sub">Connect a scheduling tool so the agent can check availability and book during the call. Bookable items will appear here once connected.</div>
+          <button class="btn primary" onclick="setStep(2)">Connect a scheduler</button>
+        </div>
+      </div>
+
+      <div class="sec" style="opacity:.45">
+        <div class="sec-hd">Field mapping</div>
+        <div class="banner"><span class="bi">i</span><div>Pick a scheduler above to see its booking fields here.</div></div>
+      </div>
+
+      <div class="sec" style="opacity:.45">
+        <div class="sec-hd">Output variables <span class="sec-aux">added to call state</span></div>
+        <div class="outputs-grid">
+          <div class="output-row"><span class="var-chip">{{node.time}}</span><span class="desc">Booked time (ISO + display)</span></div>
+          <div class="output-row"><span class="var-chip">{{node.host_name}}</span><span class="desc">Host name</span></div>
+          <div class="output-row"><span class="var-chip">{{node.join_link}}</span><span class="desc">Conferencing URL</span></div>
+          <div class="output-row"><span class="var-chip">{{node.booking_id}}</span><span class="desc">For activity log</span></div>
+          <div class="output-row"><span class="var-chip">{{node.failure_reason}}</span><span class="desc">refused · no_availability · error · …</span></div>
+          <div class="output-row"><span class="var-chip">{{node.failure_detail}}</span><span class="desc">Human-readable detail</span></div>
+        </div>
+      </div>
+
+      <div class="sec" style="opacity:.45">
+        <div class="sec-hd">Exit edges <span class="sec-aux">wired on the canvas</span></div>
+        <div class="edges-list">
+          <div class="edge-row ok"><span class="pdot"></span><span class="edge-name">Booked</span><span class="edge-target">Not connected</span></div>
+          <div class="edge-row warn"><span class="pdot"></span><span class="edge-name">Not booked</span><span class="edge-target">Not connected</span></div>
+        </div>
+        <div style="font-size:10px;color:#666;margin-top:7px;line-height:1.6">For granular routing by failure reason, branch on <span class="var-chip" style="font-size:10px">{{node.failure_reason}}</span> downstream with a Condition node.</div>
+      </div>
+    `)}
+  `);
+}
+
+/* ══════════════════════════════════════════
+   Screen 3 — Provider picker
+═══════════════════════════════════════════ */
+function s3(){
+  return chrome(`
+    ${flowchart({selectedNode:'book'})}
+    ${panel(`
+      <div class="sec">
+        <div class="sec-hd">Scheduler <span class="sec-aux">pick a provider</span></div>
+        <div class="provider-list">
+          <div class="provider selected" onclick="setStep(3)">
+            <div class="provider-icon" style="background:#006bff">C</div>
+            <div class="provider-name">Calendly</div>
+          </div>
+          <div class="provider">
+            <div class="provider-icon" style="background:#ff7a59">H</div>
+            <div class="provider-name">HubSpot Meetings</div>
+          </div>
+          <div class="provider">
+            <div class="provider-icon" style="background:#ff6c2a">CP</div>
+            <div class="provider-name">Chili Piper</div>
+          </div>
+          <div class="provider">
+            <div class="provider-icon" style="background:#0078d4">MB</div>
+            <div class="provider-name">MS Bookings</div>
+          </div>
+          <div class="provider">
+            <div class="provider-icon" style="background:#0d2b3e">C</div>
+            <div class="provider-name">Cal.com</div>
+          </div>
+          <div class="provider" style="opacity:.5">
+            <div class="provider-icon" style="background:#252540;color:#888">G</div>
+            <div class="provider-name" style="color:#666">Google Appt. Sched.</div>
+          </div>
+        </div>
+        <div class="banner" style="margin-top:11px"><span class="bi">i</span><div>Connecting here adds the scheduler at the account level — it'll be available in other agents too. You can manage it later in Settings → Integrations.</div></div>
+      </div>
+
+      <div class="sec" style="opacity:.45">
+        <div class="sec-hd">Field mapping</div>
+        <div class="banner"><span class="bi">i</span><div>Pick a scheduler above to see its booking fields here.</div></div>
+      </div>
+    `)}
+  `);
+}
+
+/* ══════════════════════════════════════════
+   Screen 4 — Static scheduler, fully configured
+═══════════════════════════════════════════ */
+function s4(){
+  return chrome(`
+    ${flowchart({selectedNode:'book'})}
+    ${panel(`
+      <div class="sec">
+        <div class="sec-hd">Scheduler</div>
+        <div style="margin-bottom:11px">
+          <div class="sec-hd" style="font-size:9px;margin-bottom:5px;color:#666">Connection</div>
+          <div class="dyn-select">
+            <div class="dyn-select-l">
+              <div class="dyn-icon" style="background:#006bff">C</div>
+              <div class="dyn-text">Calendly · acme-sales@acme.com</div>
+            </div>
+            <span class="dyn-arrow">▾</span>
+          </div>
+        </div>
+        <div>
+          <div class="sec-hd" style="font-size:9px;margin-bottom:5px;color:#666">Scheduler</div>
+          <div class="mode-tabs">
+            <div class="mode-tab on">Static</div>
+            <div class="mode-tab" onclick="setStep(4)">Variable</div>
+          </div>
+          <div class="dyn-select">
+            <div class="dyn-select-l">
+              <div class="dyn-text">Demo — 30 min</div>
+            </div>
+            <span class="dyn-arrow">▾</span>
+          </div>
+          <div style="font-size:10px;color:#666;margin-top:5px">Hosted by AE round-robin · 7-day search window · Buffers managed in Calendly.</div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-hd">Field mapping <span class="sec-aux">from agent variables → Calendly form</span></div>
+        <table class="map-table">
+          <tr>
+            <td style="width:50%"><span class="scheduler-field">Name<span class="field-required">required</span></span></td>
+            <td><div class="dyn-select" style="padding:6px 9px"><div class="dyn-select-l"><span class="dyn-mode active">var</span><span class="var-chip">{{contact.first_name}} {{contact.last_name}}</span></div><span class="dyn-arrow">▾</span></div></td>
+          </tr>
+          <tr>
+            <td><span class="scheduler-field">Email<span class="field-required">required</span></span></td>
+            <td><div class="dyn-select" style="padding:6px 9px"><div class="dyn-select-l"><span class="dyn-mode active">var</span><span class="var-chip">{{contact.email}}</span></div><span class="dyn-arrow">▾</span></div></td>
+          </tr>
+          <tr>
+            <td><span class="scheduler-field">Phone</span></td>
+            <td><div class="dyn-select" style="padding:6px 9px"><div class="dyn-select-l"><span class="dyn-mode active">var</span><span class="var-chip">{{contact.phone}}</span></div><span class="dyn-arrow">▾</span></div></td>
+          </tr>
+          <tr>
+            <td><span class="scheduler-field">Company</span></td>
+            <td><div class="dyn-select" style="padding:6px 9px"><div class="dyn-select-l"><span class="dyn-mode active">var</span><span class="var-chip">{{contact.company}}</span></div><span class="dyn-arrow">▾</span></div></td>
+          </tr>
+          <tr>
+            <td><span class="scheduler-field">What brings you in?</span></td>
+            <td><div class="dyn-select" style="padding:6px 9px"><div class="dyn-select-l"><span class="dyn-mode active">var</span><span class="var-chip">{{pain_point}}</span></div><span class="dyn-arrow">▾</span></div></td>
+          </tr>
+          <tr>
+            <td><span class="scheduler-field">Budget tier</span></td>
+            <td><div class="dyn-select" style="padding:6px 9px"><div class="dyn-select-l"><span class="dyn-mode active">var</span><span class="var-chip">{{interest_tier}}</span></div><span class="dyn-arrow">▾</span></div></td>
+          </tr>
+          <tr>
+            <td><span class="scheduler-field">Notes for host</span></td>
+            <td><div class="dyn-select" style="padding:6px 9px"><div class="dyn-select-l"><span class="dyn-mode active">var</span><span class="var-chip">{{call_summary}}</span></div><span class="dyn-arrow">▾</span></div></td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="sec">
+        <div class="sec-hd">Output variables <span class="sec-aux">added to call state</span></div>
+        <div class="outputs-grid">
+          <div class="output-row"><span class="var-chip">{{schedule_demo.time}}</span><span class="desc">Booked time</span></div>
+          <div class="output-row"><span class="var-chip">{{schedule_demo.host_name}}</span><span class="desc">Host name</span></div>
+          <div class="output-row"><span class="var-chip">{{schedule_demo.join_link}}</span><span class="desc">Conferencing URL</span></div>
+          <div class="output-row"><span class="var-chip">{{schedule_demo.booking_id}}</span><span class="desc">For activity log</span></div>
+          <div class="output-row"><span class="var-chip">{{schedule_demo.failure_reason}}</span><span class="desc">refused · no_availability · error · …</span></div>
+          <div class="output-row"><span class="var-chip">{{schedule_demo.failure_detail}}</span><span class="desc">Human-readable detail</span></div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-hd">Exit edges</div>
+        <div class="edges-list">
+          <div class="edge-row ok"><span class="pdot"></span><span class="edge-name">Booked</span><span class="edge-target">Not wired</span></div>
+          <div class="edge-row warn"><span class="pdot"></span><span class="edge-name">Not booked</span><span class="edge-target">Not wired</span></div>
+        </div>
+        <div style="font-size:10px;color:#666;margin-top:7px;line-height:1.6">For granular routing by failure reason, branch on <span class="var-chip" style="font-size:10px">{{schedule_demo.failure_reason}}</span> downstream with a Condition node.</div>
+      </div>
+    `)}
+  `);
+}
+
+/* ══════════════════════════════════════════
+   Screen 5 — Variable scheduler mode
+═══════════════════════════════════════════ */
+function s5(){
+  return chrome(`
+    ${flowchart({selectedNode:'book'})}
+    ${panel(`
+      <div class="sec">
+        <div class="sec-hd">Scheduler</div>
+        <div style="margin-bottom:11px">
+          <div class="sec-hd" style="font-size:9px;margin-bottom:5px;color:#666">Connection</div>
+          <div class="dyn-select">
+            <div class="dyn-select-l">
+              <div class="dyn-icon" style="background:#006bff">C</div>
+              <div class="dyn-text">Calendly · acme-sales@acme.com</div>
+            </div>
+            <span class="dyn-arrow">▾</span>
+          </div>
+        </div>
+        <div>
+          <div class="sec-hd" style="font-size:9px;margin-bottom:5px;color:#666">Scheduler</div>
+          <div class="mode-tabs">
+            <div class="mode-tab" onclick="setStep(3)">Static</div>
+            <div class="mode-tab on">Variable</div>
+          </div>
+          <div class="dyn-select">
+            <div class="dyn-select-l">
+              <span class="dyn-mode active">var</span>
+              <span class="var-chip">{{contact.owner.calendly_link}}</span>
+            </div>
+            <span class="dyn-arrow">▾</span>
+          </div>
+          <div style="font-size:10px;color:#666;margin-top:5px;line-height:1.6">At call time, this resolves to the contact's owner's personal Calendly link. Falls back to <span class="var-chip" style="font-size:10px">"Demo — 30 min"</span> if unset.</div>
+        </div>
+        <div class="banner warn" style="margin-top:11px"><span class="bi" style="color:#cc8800">⚠</span><div>The scheduler's form schema isn't known at config time, so field mapping below collapses to the generic invitee shape. To map custom Calendly form fields, switch to Static mode and create separate nodes per scheduler.</div></div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-hd">Field mapping <span class="sec-aux">generic invitee shape (variable mode)</span></div>
+        <table class="map-table">
+          <tr>
+            <td style="width:50%"><span class="scheduler-field">Name<span class="field-required">required</span></span></td>
+            <td><div class="dyn-select" style="padding:6px 9px"><div class="dyn-select-l"><span class="dyn-mode active">var</span><span class="var-chip">{{contact.first_name}} {{contact.last_name}}</span></div><span class="dyn-arrow">▾</span></div></td>
+          </tr>
+          <tr>
+            <td><span class="scheduler-field">Email<span class="field-required">required</span></span></td>
+            <td><div class="dyn-select" style="padding:6px 9px"><div class="dyn-select-l"><span class="dyn-mode active">var</span><span class="var-chip">{{contact.email}}</span></div><span class="dyn-arrow">▾</span></div></td>
+          </tr>
+          <tr>
+            <td><span class="scheduler-field">Phone</span></td>
+            <td><div class="dyn-select" style="padding:6px 9px"><div class="dyn-select-l"><span class="dyn-mode active">var</span><span class="var-chip">{{contact.phone}}</span></div><span class="dyn-arrow">▾</span></div></td>
+          </tr>
+          <tr>
+            <td><span class="scheduler-field">Notes for host</span></td>
+            <td><div class="dyn-select" style="padding:6px 9px"><div class="dyn-select-l"><span class="dyn-mode active">var</span><span class="var-chip">{{call_summary}}</span></div><span class="dyn-arrow">▾</span></div></td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="sec">
+        <div class="sec-hd">Output variables <span class="sec-aux">added to call state</span></div>
+        <div class="outputs-grid">
+          <div class="output-row"><span class="var-chip">{{schedule_demo.time}}</span><span class="desc">Booked time</span></div>
+          <div class="output-row"><span class="var-chip">{{schedule_demo.host_name}}</span><span class="desc">Host name</span></div>
+          <div class="output-row"><span class="var-chip">{{schedule_demo.join_link}}</span><span class="desc">Conferencing URL</span></div>
+          <div class="output-row"><span class="var-chip">{{schedule_demo.booking_id}}</span><span class="desc">For activity log</span></div>
+          <div class="output-row"><span class="var-chip">{{schedule_demo.failure_reason}}</span><span class="desc">refused · no_availability · error · …</span></div>
+          <div class="output-row"><span class="var-chip">{{schedule_demo.failure_detail}}</span><span class="desc">Human-readable detail</span></div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-hd">Exit edges</div>
+        <div class="edges-list">
+          <div class="edge-row ok"><span class="pdot"></span><span class="edge-name">Booked</span><span class="edge-target">Not wired</span></div>
+          <div class="edge-row warn"><span class="pdot"></span><span class="edge-name">Not booked</span><span class="edge-target">Not wired</span></div>
+        </div>
+      </div>
+    `)}
+  `);
+}
+
+/* ══════════════════════════════════════════
+   Screen 6 — Final flowchart, configured
+═══════════════════════════════════════════ */
+function s6(){
+  return chrome(flowchart({bookConfigured:true, branched:true}));
+}
+
+render();
+</script>
+</body>
+</html>

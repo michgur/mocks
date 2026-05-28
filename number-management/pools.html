@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Harmony — Number Pools</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0b0b14;min-height:100vh;display:flex;flex-direction:column;color:#e0e0f0}
+button,input,select{font-family:inherit}
+
+/* topbar */
+.topbar{background:#0b0b14;padding:10px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #181828;flex-shrink:0}
+.logo{display:flex;align-items:center;gap:6px}
+.logo-box{width:20px;height:20px;border-radius:5px;background:linear-gradient(135deg,#7c5cfc,#5c9cfc);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:#fff}
+.logo-text{font-size:13px;font-weight:700;color:#e0e0f0}
+.step-nav{display:flex;align-items:center;gap:10px}
+.step-dots{display:flex;gap:5px}
+.sdot{width:7px;height:7px;border-radius:50%;background:#222232;cursor:pointer;transition:background .2s}
+.sdot.active{background:#7c5cfc;box-shadow:0 0 5px #7c5cfc88}
+.sdot.done{background:#2a6e4a}
+.btn-nav{background:#181828;border:1px solid #252540;color:#888;padding:5px 13px;border-radius:6px;font-size:12px;cursor:pointer;transition:all .15s}
+.btn-nav:hover:not(:disabled){background:#1e1e2e;color:#ddd}
+.btn-nav:disabled{opacity:.28;cursor:default}
+.step-lbl{font-size:11px;color:#555;min-width:240px;text-align:center}
+.step-lbl strong{color:#9988dd}
+
+/* chrome */
+.screen{flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative}
+.h-chrome{flex:1;display:flex;flex-direction:column;background:#12121e;overflow:hidden}
+.h-topbar{background:#181828;border-bottom:1px solid #222238;padding:0 14px;display:flex;align-items:center;gap:0;flex-shrink:0;height:38px}
+.h-topbar-logo{display:flex;align-items:center;gap:6px;padding-right:14px;border-right:1px solid #222238;margin-right:8px;height:100%}
+.h-topbar-tab{padding:10px 12px;font-size:12px;color:#666;cursor:pointer;border-bottom:2px solid transparent;font-weight:600}
+.h-topbar-tab.on{color:#e0e0f0;border-bottom-color:#7c5cfc}
+.h-topbar-acct{margin-left:auto;display:flex;align-items:center;gap:10px;padding-right:6px}
+.h-topbar-acct .entity{font-size:11px;color:#999;border:1px solid #222238;border-radius:5px;padding:3px 8px;display:flex;align-items:center;gap:5px}
+.h-topbar-acct .entity .dot{width:6px;height:6px;border-radius:50%;background:#7c5cfc}
+.h-topbar-acct .avatar{width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,#444,#222)}
+
+.h-layout{flex:1;display:grid;grid-template-columns:220px 1fr;overflow:hidden}
+.h-sidebar{background:#181828;border-right:1px solid #222238;padding:8px 0;overflow-y:auto}
+.h-sidebar-section{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#444;padding:12px 14px 4px}
+.h-sidebar-item{padding:6px 14px;font-size:12px;color:#666;cursor:pointer;border-left:2px solid transparent;display:flex;align-items:center;gap:8px}
+.h-sidebar-item:hover{color:#aaa}
+.h-sidebar-item.on{color:#ddd;border-left-color:#7c5cfc;background:#1c1c2e}
+.h-sidebar-icon{width:14px;height:14px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;flex-shrink:0;background:#252540;color:#9977dd}
+.h-main{overflow-y:auto;padding:22px 26px}
+
+/* page headings */
+.page-hd{font-size:20px;font-weight:800;color:#e0e0f0;margin-bottom:4px;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.page-sub{font-size:12px;color:#666;margin-bottom:20px;line-height:1.6;max-width:720px}
+.h-back{font-size:11px;color:#666;cursor:pointer;margin-bottom:6px;display:inline-block}
+.h-back:hover{color:#aaa}
+
+/* buttons */
+.btn{padding:6px 13px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;border:none;transition:all .15s;font-family:inherit;display:inline-flex;align-items:center;gap:5px}
+.btn.primary{background:linear-gradient(135deg,#7c5cfc,#5c9cfc);color:#fff}
+.btn.primary:hover{filter:brightness(1.1)}
+.btn.ghost{background:#1c1c2e;border:1px solid #2e2e42;color:#aaa}
+.btn.ghost:hover{color:#ddd;border-color:#555}
+.btn.ghost-sm{background:transparent;border:1px solid #2e2e42;color:#888;padding:4px 10px;font-size:11px;border-radius:5px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:5px}
+.btn.ghost-sm:hover{color:#ddd;border-color:#555}
+
+/* cards */
+.card{background:#181828;border:1px solid #222238;border-radius:9px;padding:16px 18px;margin-bottom:14px}
+.card-title{font-size:13px;font-weight:700;color:#e0e0f0;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.card-sub{font-size:11px;color:#666;margin-top:4px;line-height:1.6}
+
+/* tags */
+.tag{font-size:10px;font-weight:700;padding:3px 7px;border-radius:4px;text-transform:uppercase;letter-spacing:.06em;display:inline-block}
+.tag.active{background:#141e1a;color:#3ecf8e;border:1px solid #3ecf8e44}
+.tag.degraded{background:#241e10;color:#e0b157;border:1px solid #e0b15744}
+.tag.provisioning{background:#101e2a;color:#5c9cfc;border:1px solid #5c9cfc55}
+.tag.off{background:#1e1e2e;color:#777;border:1px solid #2e2e42}
+.tag.watching{background:#241e10;color:#e0b157;border:1px solid #e0b15744}
+
+/* tables */
+.tbl{width:100%;border-collapse:collapse;font-size:12px}
+.tbl th{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#555;padding:10px 14px;border-bottom:1px solid #252540;text-align:left;background:#15151f}
+.tbl td{padding:13px 14px;border-bottom:1px solid #1e1e2e;vertical-align:middle;color:#bbb}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr.clickable{cursor:pointer;transition:background .12s}
+.tbl tr.clickable:hover td{background:#1c1c2e}
+.tbl .pool-name{font-weight:700;color:#e0e0f0;font-size:13px}
+.tbl .pool-meta{font-size:10px;color:#666;margin-top:2px}
+.mono{font-family:'JetBrains Mono','SF Mono',Menlo,monospace}
+
+/* pool detail header */
+.pool-hd{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:16px}
+.pool-hd-title{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.pool-hd-title h1{font-size:22px;font-weight:800;color:#e0e0f0}
+.pool-hd-sub{font-size:12px;color:#666}
+.pool-hd-actions{display:flex;gap:8px}
+
+/* capability strip */
+.cap-strip{background:#181828;border:1px solid #222238;border-radius:9px;padding:11px 16px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.cap-strip-items{display:flex;align-items:center;gap:20px;flex-wrap:wrap;font-size:12px}
+.cap-strip-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#555}
+.cap-item{display:flex;align-items:center;gap:6px;color:#ccc}
+.cap-item .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;background:#3ecf8e}
+.cap-link{font-size:11px;color:#9977dd;cursor:pointer;font-weight:600}
+.cap-link:hover{color:#b099f0;text-decoration:underline}
+
+/* pool grid (numbers table left, composition+settings right) */
+.pool-grid{display:grid;grid-template-columns:1fr 280px;gap:18px;align-items:start}
+
+/* composition (single column) */
+.comp-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;font-size:12px;color:#bbb;border-bottom:1px solid #1e1e2e}
+.comp-row:last-of-type{border-bottom:none}
+.comp-row.total{border-top:1px solid #2e2e42;padding-top:9px;margin-top:4px;color:#888;font-weight:600}
+.comp-row .label{display:flex;flex-direction:column}
+.comp-row .num{font-weight:700;color:#ddd;font-family:'JetBrains Mono','SF Mono',Menlo,monospace;font-size:12px}
+.comp-row .num.ok{color:#3ecf8e}
+.comp-row .num.warn{color:#e0b157}
+
+/* numbers table - health bars */
+.health-cell{display:flex;align-items:center;gap:8px}
+.health-track{width:60px;height:5px;background:#252540;border-radius:3px;overflow:hidden}
+.health-fill{height:100%;border-radius:3px}
+.health-fill.good{background:#3ecf8e}
+.health-fill.watch{background:#e0b157}
+.health-num{font-size:11px;font-weight:700;width:28px;color:#ccc}
+
+/* settings cards (sidebar) */
+.setting-card{background:#181828;border:1px solid #222238;border-radius:9px;padding:13px 15px;margin-bottom:11px}
+.setting-card-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.setting-card-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#555}
+.setting-card-edit{font-size:10px;color:#9977dd;cursor:pointer;font-weight:600}
+.setting-card-edit:hover{color:#b099f0}
+.setting-card-main{font-size:12px;font-weight:600;color:#ddd;margin-bottom:3px}
+.setting-card-sub{font-size:11px;color:#666;line-height:1.5}
+.agent-row{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:12px;color:#ccc}
+.agent-av{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#fff;flex-shrink:0}
+
+/* create pool — sections */
+.step-section{background:#181828;border:1px solid #222238;border-radius:9px;padding:18px 20px;margin-bottom:13px}
+.step-section-hd{display:flex;align-items:center;gap:10px;margin-bottom:5px}
+.step-num{width:22px;height:22px;border-radius:50%;background:#1c1c2e;border:1px solid #2e2e42;color:#9977dd;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0}
+.step-title{font-size:14px;font-weight:700;color:#e0e0f0}
+.step-desc{font-size:11px;color:#666;margin:0 0 12px 32px;line-height:1.6}
+.step-body{margin-left:32px}
+
+/* form */
+.field-label{font-size:11px;font-weight:600;color:#aaa;margin-bottom:5px;display:block}
+.input,.select{background:#13131f;border:1px solid #2e2e42;color:#ddd;padding:7px 11px;border-radius:6px;font-size:12px;font-family:inherit;width:100%}
+.input:focus,.select:focus{outline:none;border-color:#7c5cfc}
+.comp-input-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.comp-input-row .select{flex:1}
+.comp-input-row .input{flex:0 0 70px;text-align:center}
+.comp-input-row .x{background:transparent;border:none;color:#555;font-size:14px;cursor:pointer;padding:4px 8px}
+.comp-input-row .x:hover{color:#d99}
+
+/* radio cards */
+.radio-cards{display:flex;flex-direction:column;gap:7px}
+.radio-card{display:flex;gap:11px;padding:11px 14px;border:1px solid #2e2e42;border-radius:8px;cursor:pointer;background:#15151f;transition:all .12s}
+.radio-card:hover{border-color:#555}
+.radio-card.checked{border-color:#7c5cfc;background:#1c1828}
+.radio-card input{margin-top:2px;accent-color:#7c5cfc;flex-shrink:0}
+.radio-card-body{flex:1}
+.radio-card-title{font-size:12px;font-weight:600;color:#ddd;margin-bottom:3px}
+.radio-card-sub{font-size:11px;color:#777;line-height:1.5}
+.radio-card-detail{margin-top:8px}
+
+/* agent checkbox rows */
+.agent-pick{display:flex;align-items:center;gap:10px;padding:8px 11px;border:1px solid #2e2e42;border-radius:7px;background:#15151f;margin-bottom:6px;cursor:pointer}
+.agent-pick:hover{border-color:#555}
+.agent-pick input{accent-color:#7c5cfc}
+.agent-pick.checked{border-color:#7c5cfc55;background:#1c1828}
+
+/* toggle */
+.tog{position:relative;display:inline-block;width:34px;height:18px;flex-shrink:0;cursor:pointer}
+.tog-track{width:100%;height:100%;background:#252540;border-radius:9px;transition:background .15s}
+.tog-knob{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#aaa;transition:transform .15s,background .15s}
+.tog.on .tog-track{background:#7c5cfc}
+.tog.on .tog-knob{transform:translateX(16px);background:#fff}
+.tog-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 14px;background:#15151f;border:1px solid #2e2e42;border-radius:7px}
+
+/* action bar */
+.action-bar{display:flex;justify-content:flex-end;align-items:center;gap:8px;padding-top:14px;border-top:1px solid #222238;margin-top:4px}
+
+/* footer */
+.footer{background:#0b0b14;border-top:1px solid #181828;padding:9px 24px;font-size:11px;color:#666;display:flex;align-items:flex-start;gap:8px;flex-shrink:0}
+.footer-num{background:#7c5cfc;color:#fff;width:17px;height:17px;border-radius:50%;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+
+.fade{animation:fi .25s ease}
+@keyframes fi{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-thumb{background:#252540;border-radius:3px}
+::-webkit-scrollbar-track{background:transparent}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo"><div class="logo-box">H</div><div class="logo-text">Harmony</div></div>
+  <div class="step-nav">
+    <button class="btn-nav" id="btn-prev" onclick="go(-1)">← Prev</button>
+    <div class="step-dots" id="dots"></div>
+    <div class="step-lbl" id="step-lbl"></div>
+    <button class="btn-nav" id="btn-next" onclick="go(1)">Next →</button>
+  </div>
+</div>
+
+<div class="screen" id="screen"></div>
+
+<div class="footer">
+  <div class="footer-num" id="footer-num">1</div>
+  <div id="footer-text"></div>
+</div>
+
+<script>
+const STEPS = [
+  {label:'Pools index',
+   footer:'Entry surface. Pools list scoped to the legal entity. Each row shows status, roster (actual / target), and which agents use the pool. Click a row to open it.',
+   render:screenPoolsIndex},
+  {label:'Create pool',
+   footer:'Single-page form with the five core decisions: details (name + legal entity), composition (countries and counts we keep topped up), incoming-call policy, outbound agents, and whether we auto-replace bad numbers.',
+   render:screenCreatePool},
+  {label:'Pool detail',
+   footer:'Capability strip at top (entity-level, shared across the pool because capabilities apply to the legal entity). Numbers table fills the main area. Composition contract + settings live in the right column.',
+   render:screenPoolDetail},
+];
+
+let step = 0;
+function go(d){ setStep(step+d); }
+function setStep(n){ if(n<0||n>=STEPS.length) return; step=n; render(); }
+function render(){
+  document.getElementById('dots').innerHTML = STEPS.map((_,i)=>{
+    const c='sdot'+(i===step?' active':i<step?' done':'');
+    return `<div class="${c}" onclick="setStep(${i})"></div>`;
+  }).join('');
+  document.getElementById('step-lbl').innerHTML = `<strong>${step+1}/${STEPS.length}</strong> — ${STEPS[step].label}`;
+  document.getElementById('btn-prev').disabled = step===0;
+  document.getElementById('btn-next').disabled = step===STEPS.length-1;
+  document.getElementById('footer-num').textContent = step+1;
+  document.getElementById('footer-text').textContent = STEPS[step].footer;
+  document.getElementById('screen').innerHTML = STEPS[step].render();
+}
+
+/* ── Chrome ── */
+function chrome(content){
+  const topTabs = ['Agents','Conversations','Contacts','Settings'];
+  const sidebar = `
+    <div class="h-sidebar-section">Account</div>
+    <div class="h-sidebar-item">General</div>
+    <div class="h-sidebar-item">Members</div>
+    <div class="h-sidebar-item">Billing</div>
+    <div class="h-sidebar-section">Telephony</div>
+    <div class="h-sidebar-item on"><div class="h-sidebar-icon">#</div>Number Pools</div>
+    <div class="h-sidebar-item"><div class="h-sidebar-icon">⌁</div>Capabilities</div>
+    <div class="h-sidebar-item"><div class="h-sidebar-icon">⌗</div>Legal Entities</div>
+    <div class="h-sidebar-section">Integrations</div>
+    <div class="h-sidebar-item">All integrations</div>
+  `;
+  return `
+    <div class="h-chrome fade">
+      <div class="h-topbar">
+        <div class="h-topbar-logo">
+          <div class="logo-box" style="width:18px;height:18px;font-size:8px;border-radius:4px">H</div>
+          <span style="font-size:12px;font-weight:700;color:#ddd">Harmony</span>
+        </div>
+        ${topTabs.map(t=>`<div class="h-topbar-tab ${t==='Settings'?'on':''}">${t}</div>`).join('')}
+        <div class="h-topbar-acct">
+          <div class="entity"><div class="dot"></div>Acme Inc ▾</div>
+          <div class="avatar"></div>
+        </div>
+      </div>
+      <div class="h-layout">
+        <div class="h-sidebar">${sidebar}</div>
+        <div class="h-main">${content}</div>
+      </div>
+    </div>`;
+}
+
+/* ══════════════════════════════════════════
+   1 — Pools index
+═══════════════════════════════════════════ */
+function screenPoolsIndex(){
+  return chrome(`
+    <div class="page-hd">
+      <div>Number Pools</div>
+      <button class="btn primary" onclick="setStep(1)">+ Create pool</button>
+    </div>
+    <div class="page-sub">Groups of phone numbers used by your agents. Each pool has its own composition, routing, and rotation rules.</div>
+
+    <div class="card" style="padding:0;overflow:hidden">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th style="width:38%">Pool</th>
+            <th>Status</th>
+            <th>Roster</th>
+            <th>Agents</th>
+            <th style="width:24px"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="clickable" onclick="setStep(2)">
+            <td>
+              <div class="pool-name">Sales East Coast</div>
+              <div class="pool-meta">US · CA, NY</div>
+            </td>
+            <td><span class="tag active">Active</span></td>
+            <td>7 / 7</td>
+            <td>Outreach, Renewals</td>
+            <td style="color:#444;font-size:14px">›</td>
+          </tr>
+          <tr class="clickable">
+            <td>
+              <div class="pool-name">West Coast Outreach</div>
+              <div class="pool-meta">US · CA, OR, WA</div>
+            </td>
+            <td><span class="tag degraded">Degraded</span></td>
+            <td>11 / 12</td>
+            <td>Renewals</td>
+            <td style="color:#444;font-size:14px">›</td>
+          </tr>
+          <tr class="clickable">
+            <td>
+              <div class="pool-name">Main Line</div>
+              <div class="pool-meta">US · NY</div>
+            </td>
+            <td><span class="tag active">Active</span></td>
+            <td>1 / 1</td>
+            <td>Reception</td>
+            <td style="color:#444;font-size:14px">›</td>
+          </tr>
+          <tr class="clickable">
+            <td>
+              <div class="pool-name">EU Support</div>
+              <div class="pool-meta">UK, DE</div>
+            </td>
+            <td><span class="tag provisioning">Provisioning</span></td>
+            <td>0 / 5</td>
+            <td>Renewals</td>
+            <td style="color:#444;font-size:14px">›</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `);
+}
+
+/* ══════════════════════════════════════════
+   2 — Create pool
+═══════════════════════════════════════════ */
+function screenCreatePool(){
+  return chrome(`
+    <a class="h-back" onclick="setStep(0)">← Number Pools</a>
+    <div class="page-hd"><div>Create a number pool</div></div>
+    <div class="page-sub">A pool is a set of phone numbers shared by one or more agents, with its own routing and rotation rules.</div>
+
+    <div class="step-section">
+      <div class="step-section-hd"><div class="step-num">1</div><div class="step-title">Details</div></div>
+      <div class="step-body" style="display:flex;gap:14px">
+        <div style="flex:1">
+          <label class="field-label">Pool name</label>
+          <input type="text" class="input" value="Sales East Coast">
+        </div>
+        <div style="flex:1">
+          <label class="field-label">Legal entity</label>
+          <select class="select">
+            <option>Acme Inc</option>
+            <option>Acme Holdings Ltd.</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="step-section">
+      <div class="step-section-hd"><div class="step-num">2</div><div class="step-title">Composition</div></div>
+      <div class="step-desc">We'll keep the pool topped up to match this shape. Numbers are scanned for spam reputation before being acquired.</div>
+      <div class="step-body">
+        <div class="comp-input-row">
+          <select class="select"><option>United States</option></select>
+          <select class="select"><option>California</option></select>
+          <input type="number" value="4" class="input">
+          <button class="x">✕</button>
+        </div>
+        <div class="comp-input-row">
+          <select class="select"><option>United States</option></select>
+          <select class="select"><option>New York</option></select>
+          <input type="number" value="3" class="input">
+          <button class="x">✕</button>
+        </div>
+        <button class="btn ghost-sm" style="margin-top:4px">+ Add country / region</button>
+      </div>
+    </div>
+
+    <div class="step-section">
+      <div class="step-section-hd"><div class="step-num">3</div><div class="step-title">Incoming calls</div></div>
+      <div class="step-desc">What happens when someone calls a number in this pool?</div>
+      <div class="step-body">
+        <div class="radio-cards">
+          <label class="radio-card">
+            <input type="radio" name="incoming">
+            <div class="radio-card-body">
+              <div class="radio-card-title">Always to one agent</div>
+              <div class="radio-card-sub">For inbound-first pools (service lines, receptionists).</div>
+            </div>
+          </label>
+          <label class="radio-card checked">
+            <input type="radio" name="incoming" checked>
+            <div class="radio-card-body">
+              <div class="radio-card-title">Return to the agent who last called this contact</div>
+              <div class="radio-card-sub">For outbound campaigns expecting return calls. Falls back to a designated agent if there's no prior outgoing history.</div>
+              <div class="radio-card-detail">
+                <div class="field-label">Fallback agent</div>
+                <select class="select" style="max-width:240px">
+                  <option>Outreach</option>
+                  <option>Renewals</option>
+                </select>
+              </div>
+            </div>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="incoming">
+            <div class="radio-card-body">
+              <div class="radio-card-title">Block incoming calls</div>
+              <div class="radio-card-sub">Reject all incoming calls — outgoing-only pool.</div>
+            </div>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="step-section">
+      <div class="step-section-hd"><div class="step-num">4</div><div class="step-title">Outbound agents</div></div>
+      <div class="step-desc">Which agents can make outgoing calls from numbers in this pool?</div>
+      <div class="step-body">
+        <label class="agent-pick checked">
+          <input type="checkbox" checked>
+          <div class="agent-av" style="background:#7c5cfc">Ou</div>
+          <div style="font-size:12px;color:#ddd">Outreach</div>
+        </label>
+        <label class="agent-pick checked">
+          <input type="checkbox" checked>
+          <div class="agent-av" style="background:#e08fb5">Rn</div>
+          <div style="font-size:12px;color:#ddd">Renewals</div>
+        </label>
+        <label class="agent-pick">
+          <input type="checkbox">
+          <div class="agent-av" style="background:#e0b157">Rc</div>
+          <div style="font-size:12px;color:#ddd">Reception</div>
+        </label>
+      </div>
+    </div>
+
+    <div class="step-section">
+      <div class="step-section-hd"><div class="step-num">5</div><div class="step-title">Rotation</div></div>
+      <div class="step-desc">Auto-replace numbers when their reputation drops or they get flagged by carriers.</div>
+      <div class="step-body">
+        <div class="tog-row">
+          <div>
+            <div style="font-size:12px;font-weight:600;color:#ddd">Auto-replace</div>
+            <div style="font-size:11px;color:#666;margin-top:3px;line-height:1.5">When off, we'll still alert you on reputation drops — but won't take action.</div>
+          </div>
+          <div class="tog on"><div class="tog-track"></div><div class="tog-knob"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn ghost" onclick="setStep(0)">Cancel</button>
+      <button class="btn primary" onclick="setStep(2)">Provision pool</button>
+    </div>
+  `);
+}
+
+/* ══════════════════════════════════════════
+   3 — Pool detail
+═══════════════════════════════════════════ */
+function screenPoolDetail(){
+  return chrome(`
+    <a class="h-back" onclick="setStep(0)">← Number Pools</a>
+    <div class="pool-hd">
+      <div>
+        <div class="pool-hd-title">
+          <h1>Sales East Coast</h1>
+          <span class="tag active">Active</span>
+        </div>
+        <div class="pool-hd-sub">7 of 7 numbers active · 2 agents · Last activity 4 min ago</div>
+      </div>
+      <div class="pool-hd-actions">
+        <button class="btn ghost-sm">Edit settings</button>
+        <button class="btn ghost-sm">⋯</button>
+      </div>
+    </div>
+
+    <div class="cap-strip">
+      <div class="cap-strip-items">
+        <div class="cap-strip-label">Capabilities</div>
+        <div class="cap-item"><div class="dot"></div>Voice</div>
+        <div class="cap-item"><div class="dot"></div>SMS</div>
+        <div class="cap-item"><div class="dot"></div>Caller ID Name: <span style="color:#ddd;font-weight:600;margin-left:2px">Acme Inc</span></div>
+      </div>
+      <div class="cap-link">Manage capabilities →</div>
+    </div>
+
+    <div class="pool-grid">
+      <!-- left: numbers table only -->
+      <div class="card" style="padding:0;overflow:hidden;margin-bottom:0">
+        <div style="padding:13px 18px;border-bottom:1px solid #222238;display:flex;justify-content:space-between;align-items:center">
+          <div style="font-size:13px;font-weight:700;color:#e0e0f0">Numbers</div>
+          <div style="font-size:11px;color:#666">Median health: 88%</div>
+        </div>
+        <table class="tbl">
+          <thead>
+            <tr><th>Number</th><th>Region</th><th>Health</th><th>Status</th><th>Acquired</th></tr>
+          </thead>
+          <tbody>
+            ${numberRow('+1 (415) 555-0123','CA',92,'good','active','Active','42d ago')}
+            ${numberRow('+1 (415) 555-0156','CA',95,'good','active','Active','42d ago')}
+            ${numberRow('+1 (510) 555-0178','CA',68,'watch','watching','Watching','14d ago')}
+            ${numberRow('+1 (415) 555-0211','CA',89,'good','active','Active','42d ago')}
+            ${numberRow('+1 (212) 555-0190','NY',91,'good','active','Active','38d ago')}
+            ${numberRow('+1 (212) 555-0234','NY',87,'good','active','Active','38d ago')}
+            ${numberRow('+1 (646) 555-0265','NY',84,'good','active','Active','25d ago')}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- right: composition + settings -->
+      <div>
+        <div class="setting-card">
+          <div class="setting-card-hd">
+            <div class="setting-card-label">Composition</div>
+            <div class="setting-card-edit">Edit</div>
+          </div>
+          <div class="comp-row"><div class="label"><span>US · California</span></div><span class="num ok">4 / 4</span></div>
+          <div class="comp-row"><div class="label"><span>US · New York</span></div><span class="num ok">3 / 3</span></div>
+          <div class="comp-row total"><span>Total</span><span class="num ok">7 / 7</span></div>
+        </div>
+
+        <div class="setting-card">
+          <div class="setting-card-hd">
+            <div class="setting-card-label">Incoming calls</div>
+            <div class="setting-card-edit">Edit</div>
+          </div>
+          <div class="setting-card-main">Return to last outgoing agent</div>
+          <div class="setting-card-sub">Fallback: Outreach. If no prior outgoing history, calls route to fallback.</div>
+        </div>
+
+        <div class="setting-card">
+          <div class="setting-card-hd">
+            <div class="setting-card-label">Outbound agents</div>
+            <div class="setting-card-edit">Edit</div>
+          </div>
+          <div class="agent-row"><div class="agent-av" style="background:#7c5cfc">Ou</div><div>Outreach</div></div>
+          <div class="agent-row"><div class="agent-av" style="background:#e08fb5">Rn</div><div>Renewals</div></div>
+        </div>
+
+        <div class="setting-card">
+          <div class="setting-card-hd">
+            <div class="setting-card-label">Rotation</div>
+            <div class="setting-card-edit">Edit</div>
+          </div>
+          <div class="setting-card-main">Auto-replace on</div>
+          <div class="setting-card-sub">Bad numbers are released and replaced in the same region.</div>
+        </div>
+      </div>
+    </div>
+  `);
+}
+
+function numberRow(num, region, health, healthClass, statusClass, statusLabel, acquired){
+  return `
+    <tr>
+      <td class="mono" style="color:#ddd">${num}</td>
+      <td>${region}</td>
+      <td><div class="health-cell"><div class="health-track"><div class="health-fill ${healthClass}" style="width:${health}%"></div></div><div class="health-num">${health}%</div></div></td>
+      <td><span class="tag ${statusClass}">${statusLabel}</span></td>
+      <td style="font-size:11px;color:#666">${acquired}</td>
+    </tr>`;
+}
+
+render();
+</script>
+</body>
+</html>

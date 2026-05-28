@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Harmony × HubSpot — Setup flow</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0b0b14;min-height:100vh;display:flex;flex-direction:column;color:#e0e0f0}
+
+/* Nav */
+.topbar{background:#0b0b14;padding:10px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #181828;flex-shrink:0}
+.logo{display:flex;align-items:center;gap:6px}
+.logo-box{width:20px;height:20px;border-radius:5px;background:linear-gradient(135deg,#7c5cfc,#5c9cfc);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:#fff}
+.logo-text{font-size:13px;font-weight:700;color:#e0e0f0}
+.step-nav{display:flex;align-items:center;gap:10px}
+.step-dots{display:flex;gap:5px}
+.sdot{width:7px;height:7px;border-radius:50%;background:#222232;cursor:pointer;transition:background .2s}
+.sdot.active{background:#7c5cfc;box-shadow:0 0 5px #7c5cfc88}
+.sdot.done{background:#2a6e4a}
+.btn-nav{background:#181828;border:1px solid #252540;color:#888;padding:5px 13px;border-radius:6px;font-size:12px;cursor:pointer;transition:all .15s}
+.btn-nav:hover:not(:disabled){background:#1e1e2e;color:#ddd}
+.btn-nav:disabled{opacity:.28;cursor:default}
+.step-lbl{font-size:11px;color:#555;min-width:280px;text-align:center}
+.step-lbl strong{color:#9988dd}
+
+.screen{flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative}
+
+/* Harmony chrome */
+.h-chrome{flex:1;display:flex;flex-direction:column;background:#12121e;overflow:hidden}
+.h-topbar{background:#181828;border-bottom:1px solid #222238;padding:0 14px;display:flex;align-items:center;gap:0;flex-shrink:0;height:38px}
+.h-topbar-logo{display:flex;align-items:center;gap:6px;padding-right:14px;border-right:1px solid #222238;margin-right:8px;height:100%}
+.h-topbar-tab{padding:10px 12px;font-size:12px;color:#666;cursor:pointer;border-bottom:2px solid transparent;font-weight:600}
+.h-topbar-tab.on{color:#e0e0f0;border-bottom-color:#7c5cfc}
+
+.h-layout{flex:1;display:grid;grid-template-columns:220px 1fr;overflow:hidden}
+.h-sidebar{background:#181828;border-right:1px solid #222238;padding:8px 0;overflow-y:auto}
+.h-sidebar-section{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#444;padding:12px 14px 4px}
+.h-sidebar-item{padding:6px 14px;font-size:12px;color:#666;cursor:pointer;border-left:2px solid transparent;display:flex;align-items:center;gap:8px}
+.h-sidebar-item:hover{color:#aaa}
+.h-sidebar-item.on{color:#ddd;border-left-color:#7c5cfc;background:#1c1c2e}
+.h-sidebar-icon{width:14px;height:14px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:#fff;flex-shrink:0}
+
+.h-main{overflow-y:auto;padding:22px 26px}
+.page-hd{font-size:20px;font-weight:800;color:#e0e0f0;margin-bottom:4px}
+.page-sub{font-size:12px;color:#666;margin-bottom:20px;line-height:1.6}
+
+/* Integration list rows */
+.int-list{background:#181828;border:1px solid #222238;border-radius:9px;overflow:hidden}
+.int-row{display:flex;align-items:center;gap:14px;padding:14px 18px;border-bottom:1px solid #222238;cursor:pointer;transition:background .12s}
+.int-row:last-child{border-bottom:none}
+.int-row:hover{background:#1c1c2e}
+.int-row.on{background:#1c1828;border-left:3px solid #7c5cfc;padding-left:15px}
+.int-row-ico{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:900;color:#fff;flex-shrink:0}
+.int-row-name{font-size:14px;font-weight:700;color:#ddd}
+.int-row-sub{font-size:11px;color:#666;margin-top:2px;line-height:1.5;max-width:520px}
+.int-row-meta{margin-left:auto;display:flex;align-items:center;gap:10px}
+.status-tag{font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;text-transform:uppercase;letter-spacing:.06em}
+.status-tag.connected{background:#141e1a;color:#3ecf8e;border:1px solid #3ecf8e44}
+.status-tag.not-connected{background:#1e1e2e;color:#777;border:1px solid #2e2e42}
+
+/* Integration header */
+.int-hdr{display:flex;align-items:center;gap:14px;padding-bottom:18px;border-bottom:1px solid #222238;margin-bottom:18px}
+.int-hdr-icon{width:48px;height:48px;border-radius:11px;background:#ff7a59;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:#fff;flex-shrink:0}
+.int-hdr-title{font-size:18px;font-weight:800;color:#e0e0f0}
+.int-hdr-sub{font-size:12px;color:#666;margin-top:3px;display:flex;align-items:center;gap:8px}
+.int-hdr-actions{margin-left:auto;display:flex;gap:8px}
+.status-pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#3ecf8e;font-weight:600}
+.status-pill .dot{width:6px;height:6px;border-radius:50%;background:#3ecf8e}
+.status-pill.gray{color:#888}
+.status-pill.gray .dot{background:#888}
+
+.h-back{font-size:11px;color:#666;cursor:pointer;margin-bottom:6px;display:inline-block}
+.h-back:hover{color:#aaa}
+
+/* Buttons */
+.btn{padding:6px 13px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;border:none;transition:all .15s;font-family:inherit}
+.btn.primary{background:linear-gradient(135deg,#7c5cfc,#5c9cfc);color:#fff}
+.btn.primary:hover{filter:brightness(1.1)}
+.btn.primary.big{padding:10px 18px;font-size:13px;border-radius:7px}
+.btn.ghost{background:#1c1c2e;border:1px solid #2e2e42;color:#aaa}
+.btn.ghost:hover{color:#ddd;border-color:#555}
+.btn.ghost-sm{background:transparent;border:1px solid #2e2e42;color:#777;padding:4px 10px;font-size:11px;border-radius:5px;font-weight:600;cursor:pointer;font-family:inherit}
+.btn.ghost-sm:hover{color:#aaa;border-color:#555}
+.btn.danger-sm{background:transparent;border:1px solid #4a2e2e;color:#a55;padding:4px 10px;font-size:11px;border-radius:5px;font-weight:600;cursor:pointer;font-family:inherit}
+.btn.danger-sm:hover{color:#d99;border-color:#a55}
+
+/* Card */
+.card{background:#181828;border:1px solid #222238;border-radius:9px;padding:16px 18px;margin-bottom:14px}
+.card-title{font-size:13px;font-weight:700;color:#e0e0f0;display:flex;align-items:center;gap:8px}
+.card-sub{font-size:11px;color:#666;margin-top:3px;line-height:1.5}
+
+/* Pre-connect explainer */
+.what-list{margin-top:8px}
+.what-item{display:flex;gap:11px;padding:9px 0;border-bottom:1px solid #1e1e2e;font-size:12px;color:#aaa;line-height:1.6}
+.what-item:last-child{border-bottom:none}
+.what-ico{width:22px;height:22px;border-radius:5px;background:#1c1c2e;color:#9977dd;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;margin-top:1px}
+.what-ico.green{color:#3ecf8e;background:#141e1a}
+.what-name{font-weight:600;color:#ddd;margin-bottom:2px}
+.what-sub{font-size:11px;color:#666;line-height:1.5}
+
+.scope-list{display:flex;flex-direction:column;gap:5px;margin-top:6px;font-size:11px;color:#888;font-family:monospace}
+.scope-list .scope{padding:5px 9px;background:#13131f;border:1px solid #252540;border-radius:5px;display:inline-flex;gap:8px;align-items:center}
+.scope-tag{font-size:9px;color:#3ecf8e;background:#141e1a;border:1px solid #3ecf8e44;border-radius:3px;padding:1px 5px;font-weight:700;font-family:-apple-system,sans-serif}
+
+.connect-block{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:16px 18px;background:linear-gradient(135deg,#1c1828 0%,#181828 100%);border:1px solid #7c5cfc55;border-radius:9px;margin-bottom:14px}
+.connect-block-text{font-size:12px;color:#888;line-height:1.6}
+.connect-block-text strong{color:#ddd;font-weight:700}
+
+/* OAuth screen (HubSpot-styled overlay) */
+.oauth-bg{position:absolute;inset:0;background:rgba(5,5,15,.85);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:100}
+.oauth-win{background:#fff;border-radius:11px;width:440px;max-width:90%;box-shadow:0 24px 64px rgba(0,0,0,.6);overflow:hidden;color:#33475b;font-family:-apple-system,BlinkMacSystemFont,"Lato",sans-serif}
+.oauth-titlebar{background:#f5f8fa;border-bottom:1px solid #dfe3eb;padding:9px 14px;font-size:11px;color:#7c98b6;display:flex;align-items:center;gap:7px}
+.oauth-titlebar .lock{font-size:10px}
+.oauth-body{padding:24px 28px}
+.oauth-logos{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+.oauth-logo{width:46px;height:46px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:900;color:#fff}
+.oauth-logo.hs{background:#ff7a59}
+.oauth-logo.h{background:linear-gradient(135deg,#7c5cfc,#5c9cfc)}
+.oauth-conn{flex:1;display:flex;align-items:center;gap:6px;color:#cbd6e2;font-size:18px}
+.oauth-hd{font-size:16px;font-weight:700;color:#33475b;margin-bottom:6px;line-height:1.4}
+.oauth-sub{font-size:12px;color:#7c98b6;line-height:1.55;margin-bottom:14px}
+.oauth-account{background:#f5f8fa;border:1px solid #dfe3eb;border-radius:6px;padding:9px 12px;font-size:12px;color:#33475b;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
+.oauth-account .acct{font-weight:600}
+.oauth-account .chev{color:#7c98b6;font-size:11px}
+.oauth-scopes-hd{font-size:11px;font-weight:700;color:#506e91;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em}
+.oauth-scope{padding:7px 0;border-bottom:1px solid #eaf0f6;font-size:12px;color:#33475b;display:flex;gap:9px;align-items:flex-start;line-height:1.5}
+.oauth-scope:last-child{border-bottom:none}
+.oauth-scope .ck{color:#00bda5;font-weight:900;font-size:13px;margin-top:1px}
+.oauth-ft{background:#f5f8fa;border-top:1px solid #dfe3eb;padding:14px 28px;display:flex;justify-content:space-between;align-items:center}
+.oauth-cancel{background:transparent;border:none;color:#506e91;font-size:13px;font-weight:600;cursor:pointer;padding:6px 10px;font-family:inherit}
+.oauth-cancel:hover{color:#33475b}
+.oauth-grant{background:#ff7a59;color:#fff;border:none;padding:9px 18px;font-size:13px;font-weight:700;border-radius:5px;cursor:pointer;font-family:inherit}
+.oauth-grant:hover{background:#ff8b6f}
+
+/* Mapping table */
+.map-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
+.map-table th{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#555;padding:8px 8px;border-bottom:1px solid #252540;text-align:left}
+.map-table td{padding:11px 8px;border-bottom:1px solid #1e1e2e;vertical-align:middle}
+.map-table tr:last-child td{border-bottom:none}
+.map-table tr.section-row td{padding:14px 8px 6px;border-bottom:none;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#555}
+.attr-name{font-weight:600;color:#ddd;font-size:13px}
+.attr-meta{font-size:10px;color:#666;margin-top:2px;font-family:monospace}
+.var-chip-inline{color:#9977dd}
+.field-select{background:#13131f;border:1px solid #2e2e42;border-radius:5px;padding:5px 10px;font-size:11px;color:#ccc;display:inline-flex;align-items:center;justify-content:space-between;cursor:pointer;gap:8px;min-width:200px}
+.field-select:hover{border-color:#555}
+.field-select .arrow{color:#555;font-size:9px}
+.field-select .mono{font-family:monospace}
+.field-select.unmapped{border-color:#a55;color:#d99;background:#241010}
+.field-select.unmapped:hover{border-color:#d99}
+.field-select.auto{border-color:#3ecf8e44;background:#141e1a}
+.field-select.auto .mono{color:#aaa}
+.req-dot{width:5px;height:5px;border-radius:50%;background:#7c5cfc;flex-shrink:0}
+.opt-dot{width:5px;height:5px;border-radius:50%;background:#333;flex-shrink:0}
+.auto-tag{font-size:9px;font-weight:700;color:#3ecf8e;margin-left:6px;letter-spacing:.05em}
+.unmap-tag{font-size:9px;font-weight:700;color:#d99;margin-left:6px;letter-spacing:.05em}
+
+/* Setup hero / success */
+.welcome-banner{background:linear-gradient(135deg,#1c1828 0%,#181828 100%);border:1px solid #7c5cfc55;border-radius:9px;padding:14px 18px;margin-bottom:14px;display:flex;gap:14px;align-items:flex-start}
+.welcome-icon{width:32px;height:32px;border-radius:7px;background:linear-gradient(135deg,#7c5cfc,#5c9cfc);display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;flex-shrink:0}
+.welcome-title{font-size:13px;font-weight:700;color:#ddd;margin-bottom:3px}
+.welcome-body{font-size:11px;color:#888;line-height:1.6}
+
+.alert-banner{background:#241010;border:1px solid #a55;border-radius:8px;padding:11px 14px;display:flex;gap:11px;align-items:flex-start;margin-bottom:14px;font-size:11px;color:#d99;line-height:1.6}
+.alert-banner .a-ico{width:18px;height:18px;border-radius:4px;background:#33181a;color:#d99;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;margin-top:1px}
+.alert-banner strong{color:#f6b8b8;font-weight:700}
+
+/* Source picker dropdown */
+.src-dropdown{position:absolute;background:#1c1c2e;border:1px solid #2e2e42;border-radius:9px;padding:6px;width:320px;box-shadow:0 12px 36px rgba(0,0,0,.7);z-index:50}
+.src-dropdown-hdr{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#555;padding:8px 10px 4px}
+.src-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border-radius:6px;cursor:pointer;transition:background .1s}
+.src-item:hover{background:#252540}
+.src-item.selected{background:#22183e}
+.src-item-name{font-size:12px;font-weight:600;color:#ccc;font-family:monospace}
+.src-item-meta{font-size:10px;color:#666;margin-top:1px}
+
+/* Writeback toggle rows */
+.tog{position:relative;display:inline-block;width:34px;height:18px;flex-shrink:0;cursor:pointer}
+.tog-track{width:100%;height:100%;background:#252540;border-radius:9px;transition:background .15s}
+.tog-knob{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#aaa;transition:transform .15s,background .15s}
+.tog.on .tog-track{background:#7c5cfc}
+.tog.on .tog-knob{transform:translateX(16px);background:#fff}
+
+.tog-row{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid #1e1e2e;gap:18px}
+.tog-row:last-child{border-bottom:none}
+.tog-row-text{flex:1}
+.tog-row-name{font-size:12px;font-weight:600;color:#ddd;margin-bottom:3px}
+.tog-row-desc{font-size:11px;color:#666;line-height:1.5}
+
+/* Workflow setup checklist */
+.checklist{margin-top:10px}
+.check-step{display:flex;gap:14px;padding:14px 0;border-bottom:1px solid #1e1e2e}
+.check-step:last-child{border-bottom:none}
+.check-num{width:24px;height:24px;border-radius:50%;background:#1c1c2e;border:1px solid #2e2e42;color:#9977dd;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;margin-top:1px}
+.check-num.done{background:#141e1a;border-color:#3ecf8e44;color:#3ecf8e}
+.check-body{flex:1}
+.check-title{font-size:13px;font-weight:700;color:#ddd;margin-bottom:4px}
+.check-desc{font-size:11px;color:#888;line-height:1.6;margin-bottom:8px}
+.check-desc code{background:#1c1c2e;border:1px solid #2e2e42;border-radius:3px;padding:1px 6px;font-size:10px;color:#9977dd;font-family:monospace}
+.check-actions{display:flex;gap:7px;flex-wrap:wrap}
+
+.workflow-illus{background:#13131f;border:1px solid #252540;border-radius:7px;padding:10px 12px;font-size:11px;display:flex;align-items:center;gap:8px;margin-top:6px;color:#888;line-height:1.5}
+.wf-node{padding:5px 9px;background:#1c1c2e;border:1px solid #2e2e42;border-radius:4px;color:#bbb;font-weight:600;font-size:10px}
+.wf-node.harmony{background:linear-gradient(135deg,#1c1828,#181828);border-color:#7c5cfc55;color:#9977dd}
+.wf-arr{color:#444}
+
+/* Awaiting indicator */
+.await-bar{background:#13131f;border:1px solid #252540;border-radius:8px;padding:12px 14px;display:flex;align-items:center;gap:11px;font-size:11px;color:#888;margin-top:14px}
+.await-pulse{width:8px;height:8px;border-radius:50%;background:#e0b157;animation:pulse 1.8s infinite;flex-shrink:0}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* Footer */
+.footer{background:#0b0b14;border-top:1px solid #181828;padding:9px 24px;font-size:11px;color:#666;display:flex;align-items:center;gap:8px;flex-shrink:0}
+.footer-num{background:#7c5cfc;color:#fff;width:17px;height:17px;border-radius:50%;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+.fade{animation:fi .2s ease}
+@keyframes fi{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-thumb{background:#252540;border-radius:2px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo"><div class="logo-box">H</div><div class="logo-text">Harmony</div></div>
+  <div class="step-nav">
+    <button class="btn-nav" id="btn-prev" onclick="go(-1)">← Prev</button>
+    <div class="step-dots" id="dots"></div>
+    <div class="step-lbl" id="step-lbl"></div>
+    <button class="btn-nav" id="btn-next" onclick="go(1)">Next →</button>
+  </div>
+</div>
+
+<div class="screen" id="screen"></div>
+
+<div class="footer">
+  <div class="footer-num" id="footer-num">1</div>
+  <div id="footer-text"></div>
+</div>
+
+<script>
+const STEPS = [
+  {label:'Settings → Integrations · entry',
+   footer:'Discovery surface. Each integration is a row with status. HubSpot is "Not connected" — clicking it opens its detail page. Salesforce shown to communicate the multi-CRM future without building it.',
+   render:screenIntegrationsList},
+  {label:'HubSpot · pre-connect',
+   footer:'Before OAuth. Explicitly tells the user what Harmony will do (read on demand, write activities, optionally create properties) and which HubSpot scopes will be requested. Single primary CTA.',
+   render:screenPreConnect},
+  {label:'HubSpot OAuth · consent',
+   footer:'External — happens in a HubSpot-controlled window. Mocked here for completeness so the team can sanity-check the scope list. Real implementation is just an OAuth redirect.',
+   render:screenOAuth},
+  {label:'Connected · review auto-mapping',
+   footer:'Returned from OAuth. Harmony auto-mapped standard attributes from HubSpot defaults. Required Timezone could not be auto-detected (this customer doesn\'t populate hs_timezone) — surfaced as a blocking error.',
+   render:screenReviewMapping},
+  {label:'Resolve unmapped · pick source',
+   footer:'Source picker for the unmapped required attribute. Compatible HubSpot fields surfaced first. Once mapped, the connection becomes saveable.',
+   render:screenResolveMapping},
+  {label:'Writeback + workflow setup · ready',
+   footer:'Final setup step. Writeback toggles configured + numbered checklist for wiring up the HubSpot workflow action (the last-mile step where most CRM integrations fail). "Awaiting first contact" indicator until a workflow actually fires.',
+   render:screenReady},
+];
+
+let step = 0;
+function go(d){ setStep(step+d); }
+function setStep(n){ if(n<0||n>=STEPS.length) return; step=n; render(); }
+function render(){
+  document.getElementById('dots').innerHTML = STEPS.map((_,i)=>{
+    const c='sdot'+(i===step?' active':i<step?' done':'');
+    return `<div class="${c}" onclick="setStep(${i})"></div>`;
+  }).join('');
+  document.getElementById('step-lbl').innerHTML = `<strong>${step+1}/${STEPS.length}</strong> — ${STEPS[step].label}`;
+  document.getElementById('btn-prev').disabled = step===0;
+  document.getElementById('btn-next').disabled = step===STEPS.length-1;
+  document.getElementById('footer-num').textContent = step+1;
+  document.getElementById('footer-text').textContent = STEPS[step].footer;
+  document.getElementById('screen').innerHTML = STEPS[step].render();
+}
+
+/* ── Chrome ── */
+function chrome(activeTopTab, sidePanel, content, overlay=''){
+  const topTabs = ['Agents','Conversations','Contacts','Settings'];
+  let sidebar = '';
+  if(sidePanel === 'integrations-list'){
+    sidebar = `
+      <div class="h-sidebar-section">Account</div>
+      <div class="h-sidebar-item">General</div>
+      <div class="h-sidebar-item">Members</div>
+      <div class="h-sidebar-item">Billing</div>
+      <div class="h-sidebar-section">Integrations</div>
+      <div class="h-sidebar-item on">All integrations</div>
+      <div class="h-sidebar-item"><div class="h-sidebar-icon" style="background:#252540;color:#9977dd">{}</div>API keys</div>
+    `;
+  } else if(sidePanel === 'hubspot'){
+    sidebar = `
+      <div class="h-sidebar-section">Account</div>
+      <div class="h-sidebar-item">General</div>
+      <div class="h-sidebar-item">Members</div>
+      <div class="h-sidebar-item">Billing</div>
+      <div class="h-sidebar-section">Integrations</div>
+      <div class="h-sidebar-item">All integrations</div>
+      <div class="h-sidebar-item on"><div class="h-sidebar-icon" style="background:#ff7a59">H</div>HubSpot</div>
+      <div class="h-sidebar-item"><div class="h-sidebar-icon" style="background:#252540;color:#9977dd">{}</div>API keys</div>
+    `;
+  }
+  return `
+    <div class="h-chrome fade">
+      <div class="h-topbar">
+        <div class="h-topbar-logo">
+          <div class="logo-box" style="width:18px;height:18px;font-size:8px;border-radius:4px">H</div>
+          <span style="font-size:12px;font-weight:700;color:#ddd">Harmony</span>
+        </div>
+        ${topTabs.map(t=>`<div class="h-topbar-tab ${t===activeTopTab?'on':''}">${t}</div>`).join('')}
+      </div>
+      <div class="h-layout">
+        <div class="h-sidebar">${sidebar}</div>
+        <div class="h-main">${content}</div>
+      </div>
+    </div>
+    ${overlay}`;
+}
+
+/* ══════════════════════════════════════════
+   1 — Integrations list
+═══════════════════════════════════════════ */
+function screenIntegrationsList(){
+  return chrome('Settings','integrations-list',`
+    <div class="page-hd">Integrations</div>
+    <div class="page-sub">Connect your CRM and other tools so agents can pull contact data and write call activities back. Set up once per account — every agent on this workspace uses the same connection.</div>
+
+    <div class="int-list">
+      <div class="int-row" onclick="setStep(1)">
+        <div class="int-row-ico" style="background:#ff7a59">H</div>
+        <div>
+          <div class="int-row-name">HubSpot</div>
+          <div class="int-row-sub">Pull contacts on demand via workflow actions, write call activities and outcomes back to HubSpot.</div>
+        </div>
+        <div class="int-row-meta">
+          <span class="status-tag not-connected">Not connected</span>
+          <button class="btn primary">Connect</button>
+        </div>
+      </div>
+      <div class="int-row">
+        <div class="int-row-ico" style="background:#1798c1">S</div>
+        <div>
+          <div class="int-row-name">Salesforce</div>
+          <div class="int-row-sub">Pull leads and contacts, log activities to records and tasks.</div>
+        </div>
+        <div class="int-row-meta">
+          <span class="status-tag not-connected">Not connected</span>
+          <button class="btn ghost-sm">Connect</button>
+        </div>
+      </div>
+      <div class="int-row">
+        <div class="int-row-ico" style="background:#3aaee0">#</div>
+        <div>
+          <div class="int-row-name">Slack</div>
+          <div class="int-row-sub">Notify channels on meeting bookings, opt-outs, and configurable agent events.</div>
+        </div>
+        <div class="int-row-meta">
+          <span class="status-tag not-connected">Not connected</span>
+          <button class="btn ghost-sm">Connect</button>
+        </div>
+      </div>
+    </div>
+  `);
+}
+
+/* ══════════════════════════════════════════
+   2 — Pre-connect
+═══════════════════════════════════════════ */
+function screenPreConnect(){
+  return chrome('Settings','hubspot',`
+    <a class="h-back" onclick="setStep(0)">← Integrations</a>
+    <div class="int-hdr">
+      <div class="int-hdr-icon">H</div>
+      <div>
+        <div class="int-hdr-title">HubSpot</div>
+        <div class="int-hdr-sub">
+          <span class="status-pill gray"><span class="dot"></span>Not connected</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="connect-block">
+      <div class="connect-block-text">
+        <strong>Ready to connect?</strong><br>You'll be redirected to HubSpot to authorize Harmony. Takes about 30 seconds.
+      </div>
+      <button class="btn primary big" onclick="setStep(2)">Connect HubSpot →</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">What Harmony will do</div>
+      <div class="card-sub" style="margin-bottom:6px">All actions are auditable in HubSpot's activity log.</div>
+      <div class="what-list">
+        <div class="what-item">
+          <div class="what-ico">↓</div>
+          <div>
+            <div class="what-name">Read contact data on demand</div>
+            <div class="what-sub">When a HubSpot workflow enrolls a contact, Harmony fetches that one contact's mapped fields. No bulk sync in MVP.</div>
+          </div>
+        </div>
+        <div class="what-item">
+          <div class="what-ico">↑</div>
+          <div>
+            <div class="what-name">Write call activities back</div>
+            <div class="what-sub">Each call attempt becomes a HubSpot engagement with disposition, duration, and recording link.</div>
+          </div>
+        </div>
+        <div class="what-item">
+          <div class="what-ico">+</div>
+          <div>
+            <div class="what-name">Optionally create custom properties</div>
+            <div class="what-sub">Auto-create Harmony-prefixed contact properties (status, last outcome, attempt count) — toggleable.</div>
+          </div>
+        </div>
+        <div class="what-item">
+          <div class="what-ico green">▸</div>
+          <div>
+            <div class="what-name">Install workflow actions</div>
+            <div class="what-sub">Adds <code style="background:#1c1c2e;border:1px solid #2e2e42;border-radius:3px;padding:1px 6px;font-size:10px;color:#9977dd;font-family:monospace">Harmony: Enroll in agent</code> and <code style="background:#1c1c2e;border:1px solid #2e2e42;border-radius:3px;padding:1px 6px;font-size:10px;color:#9977dd;font-family:monospace">Harmony: Cancel sequence</code> to your HubSpot workflow builder.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Permissions Harmony will request</div>
+      <div class="card-sub" style="margin-bottom:8px">Standard HubSpot OAuth scopes. You can revoke at any time from HubSpot Settings → Integrations.</div>
+      <div class="scope-list">
+        <div class="scope"><span class="scope-tag">READ</span>crm.objects.contacts.read</div>
+        <div class="scope"><span class="scope-tag">READ</span>crm.schemas.contacts.read</div>
+        <div class="scope"><span class="scope-tag">READ</span>crm.objects.owners.read</div>
+        <div class="scope"><span class="scope-tag" style="color:#e0b157;background:#241e10;border-color:#e0b15744">WRITE</span>crm.objects.contacts.write</div>
+        <div class="scope"><span class="scope-tag" style="color:#e0b157;background:#241e10;border-color:#e0b15744">WRITE</span>timeline (engagements)</div>
+        <div class="scope"><span class="scope-tag" style="color:#e0b157;background:#241e10;border-color:#e0b15744">WRITE</span>automation (workflow actions)</div>
+      </div>
+    </div>
+  `);
+}
+
+/* ══════════════════════════════════════════
+   3 — OAuth consent (HubSpot side)
+═══════════════════════════════════════════ */
+function screenOAuth(){
+  const overlay = `
+    <div class="oauth-bg fade">
+      <div class="oauth-win">
+        <div class="oauth-titlebar">
+          <span class="lock">🔒</span>
+          <span>app.hubspot.com/oauth/authorize</span>
+        </div>
+        <div class="oauth-body">
+          <div class="oauth-logos">
+            <div class="oauth-logo h">H</div>
+            <div class="oauth-conn">⟷</div>
+            <div class="oauth-logo hs">H</div>
+          </div>
+          <div class="oauth-hd">Harmony is requesting access to your HubSpot account</div>
+          <div class="oauth-sub">Harmony will be able to read contacts and write activities. You can revoke access at any time from your HubSpot settings.</div>
+          <div class="oauth-account">
+            <div>Connecting account: <span class="acct">acme.hubspot.com</span></div>
+            <div class="chev">Switch ▾</div>
+          </div>
+          <div class="oauth-scopes-hd">This will allow Harmony to:</div>
+          <div class="oauth-scope"><span class="ck">✓</span><div>View contacts and their properties</div></div>
+          <div class="oauth-scope"><span class="ck">✓</span><div>View contact owners and their settings</div></div>
+          <div class="oauth-scope"><span class="ck">✓</span><div>Create and update contact properties</div></div>
+          <div class="oauth-scope"><span class="ck">✓</span><div>Log engagements and timeline events</div></div>
+          <div class="oauth-scope"><span class="ck">✓</span><div>Install and trigger custom workflow actions</div></div>
+        </div>
+        <div class="oauth-ft">
+          <button class="oauth-cancel" onclick="setStep(1)">Cancel</button>
+          <button class="oauth-grant" onclick="setStep(3)">Connect app</button>
+        </div>
+      </div>
+    </div>`;
+  return chrome('Settings','hubspot',`
+    <a class="h-back">← Integrations</a>
+    <div class="int-hdr">
+      <div class="int-hdr-icon">H</div>
+      <div>
+        <div class="int-hdr-title">HubSpot</div>
+        <div class="int-hdr-sub">
+          <span class="status-pill gray"><span class="dot" style="background:#e0b157;animation:pulse 1.8s infinite"></span>Waiting for HubSpot authorization…</span>
+        </div>
+      </div>
+    </div>
+    <div style="opacity:.4">
+      <div class="card">
+        <div class="card-title">What Harmony will do</div>
+        <div class="card-sub">Pulled contacts on demand · write activities · create custom properties · install workflow actions.</div>
+      </div>
+    </div>
+  `, overlay);
+}
+
+/* ── Mapping row helper (with auto-map + unmapped states) ── */
+function attrRow({req,name,vname,type,source,auto,unmapped,onClick,highlight}){
+  const dot = req?'<div class="req-dot"></div>':'<div class="opt-dot"></div>';
+  let fs;
+  if(unmapped){
+    fs = `<div class="field-select unmapped" ${onClick?`onclick="${onClick}"`:''}><span>Choose source…</span><span class="arrow">▾</span></div>`;
+  } else if(auto){
+    fs = `<div class="field-select auto"><span class="mono">${source}</span><span class="arrow">▾</span></div>`;
+  } else {
+    fs = `<div class="field-select"><span class="mono">${source}</span><span class="arrow">▾</span></div>`;
+  }
+  const tag = unmapped ? '<span class="unmap-tag">REQUIRED</span>' : (auto?'<span class="auto-tag">AUTO</span>':'');
+  return `<tr>
+    <td>${dot}</td>
+    <td>
+      <div class="attr-name">${name}${tag}</div>
+      <div class="attr-meta"><span class="var-chip-inline">{{${vname}}}</span> · ${type}</div>
+    </td>
+    <td>${fs}</td>
+  </tr>`;
+}
+
+function mappingTable({unmappedTimezone=false, timezoneClick=''}){
+  const rows = [
+    {req:true, name:'First name', vname:'first_name', type:'string', source:'firstname', auto:true},
+    {req:true, name:'Phone',      vname:'phone',      type:'string', source:'phone',     auto:true},
+    {req:true, name:'Timezone',   vname:'timezone',   type:'string',
+     ...(unmappedTimezone ? {unmapped:true, onClick:timezoneClick} : {source:'hs_timezone', auto:true})},
+    {req:false,name:'Email',      vname:'email',      type:'string', source:'email',     auto:true},
+    {req:false,name:'Company',    vname:'company',    type:'string', source:'company',   auto:true},
+    {req:false,name:'Job title',  vname:'job_title',  type:'string', source:'jobtitle',  auto:true},
+    {req:false,name:'Contact owner', vname:'owner',   type:'string', source:'hubspot_owner_id', auto:true},
+  ];
+  return `
+    <table class="map-table">
+      <thead>
+        <tr>
+          <th style="width:14px"></th>
+          <th>Harmony attribute</th>
+          <th>HubSpot source</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(attrRow).join('')}
+      </tbody>
+    </table>`;
+}
+
+/* ══════════════════════════════════════════
+   4 — Review auto-mapping (one unmapped)
+═══════════════════════════════════════════ */
+function screenReviewMapping(){
+  return chrome('Settings','hubspot',`
+    <a class="h-back">← Integrations</a>
+    <div class="int-hdr">
+      <div class="int-hdr-icon">H</div>
+      <div>
+        <div class="int-hdr-title">HubSpot</div>
+        <div class="int-hdr-sub">
+          <span class="status-pill"><span class="dot"></span>Connected to <strong style="color:#aaa">&nbsp;acme.hubspot.com</strong></span>
+          <span style="color:#444">·</span>
+          <span style="color:#666">Authorized just now</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="welcome-banner">
+      <div class="welcome-icon">✓</div>
+      <div>
+        <div class="welcome-title">You're connected. Review the contact mapping below to finish setup.</div>
+        <div class="welcome-body">Harmony auto-mapped 6 of 7 standard attributes from your HubSpot properties. One required attribute couldn't be auto-detected — fix it below to continue.</div>
+      </div>
+    </div>
+
+    <div class="alert-banner">
+      <div class="a-ico">!</div>
+      <div>
+        <strong>Timezone is required but unmapped.</strong> Harmony couldn't find <code style="background:#33181a;border:1px solid #a55;border-radius:3px;padding:1px 6px;font-size:10px;color:#f6b8b8;font-family:monospace">hs_timezone</code> populated on your contacts. Pick a HubSpot property that holds timezone data (used to call within local business hours).
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Contact mapping</div>
+      <div class="card-sub" style="margin-bottom:6px">The shape of a contact in Harmony, sourced from HubSpot. Available to every agent as script variables (<span class="var-chip-inline" style="font-family:monospace">{{...}}</span>).</div>
+      ${mappingTable({unmappedTimezone:true, timezoneClick:'setStep(4)'})}
+      <div style="margin-top:14px;display:flex;align-items:center;justify-content:space-between;padding-top:13px;border-top:1px solid #1e1e2e">
+        <button class="btn ghost-sm">+ Add custom attribute</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn ghost">Skip for now</button>
+          <button class="btn primary" disabled style="opacity:.4;cursor:not-allowed">Continue</button>
+        </div>
+      </div>
+    </div>
+  `);
+}
+
+/* ══════════════════════════════════════════
+   5 — Resolve unmapped (source picker open)
+═══════════════════════════════════════════ */
+function screenResolveMapping(){
+  const dropdown = `
+    <div class="src-dropdown fade" style="top:430px;left:382px">
+      <div class="src-dropdown-hdr">Choose HubSpot source for "Timezone"</div>
+      <div class="src-item" onclick="setStep(5)">
+        <div>
+          <div class="src-item-name">ip_timezone</div>
+          <div class="src-item-meta">Calculated from IP · 11,213 populated</div>
+        </div>
+      </div>
+      <div class="src-item">
+        <div>
+          <div class="src-item-name">timezone_iana</div>
+          <div class="src-item-meta">Custom property · 8,402 populated</div>
+        </div>
+      </div>
+      <div class="src-item">
+        <div>
+          <div class="src-item-name">hs_country_code</div>
+          <div class="src-item-meta">Standard · derive from country</div>
+        </div>
+      </div>
+      <div style="padding:7px 10px 4px;font-size:11px;color:#777;cursor:pointer;border-top:1px solid #252540;margin-top:4px">
+        Browse all 184 HubSpot properties →
+      </div>
+    </div>`;
+  return chrome('Settings','hubspot',`
+    <a class="h-back">← Integrations</a>
+    <div class="int-hdr">
+      <div class="int-hdr-icon">H</div>
+      <div>
+        <div class="int-hdr-title">HubSpot</div>
+        <div class="int-hdr-sub">
+          <span class="status-pill"><span class="dot"></span>Connected to <strong style="color:#aaa">&nbsp;acme.hubspot.com</strong></span>
+          <span style="color:#444">·</span>
+          <span style="color:#666">Authorized just now</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="alert-banner">
+      <div class="a-ico">!</div>
+      <div><strong>Timezone is required but unmapped.</strong> Pick a HubSpot property below.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Contact mapping</div>
+      <div class="card-sub" style="margin-bottom:6px">The shape of a contact in Harmony, sourced from HubSpot. Available to every agent as script variables.</div>
+      ${mappingTable({unmappedTimezone:true, timezoneClick:''})}
+      <div style="margin-top:14px;display:flex;align-items:center;justify-content:space-between;padding-top:13px;border-top:1px solid #1e1e2e">
+        <button class="btn ghost-sm">+ Add custom attribute</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn ghost">Skip for now</button>
+          <button class="btn primary" disabled style="opacity:.4;cursor:not-allowed">Continue</button>
+        </div>
+      </div>
+    </div>
+  `, dropdown);
+}
+
+/* ══════════════════════════════════════════
+   6 — Writeback + workflow setup · ready
+═══════════════════════════════════════════ */
+function screenReady(){
+  return chrome('Settings','hubspot',`
+    <a class="h-back">← Integrations</a>
+    <div class="int-hdr">
+      <div class="int-hdr-icon">H</div>
+      <div>
+        <div class="int-hdr-title">HubSpot</div>
+        <div class="int-hdr-sub">
+          <span class="status-pill"><span class="dot"></span>Connected to <strong style="color:#aaa">&nbsp;acme.hubspot.com</strong></span>
+          <span style="color:#444">·</span>
+          <span style="color:#666">Authorized just now</span>
+        </div>
+      </div>
+      <div class="int-hdr-actions">
+        <button class="btn ghost-sm">Reconnect</button>
+        <button class="btn danger-sm">Disconnect</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Contact mapping <span style="font-size:10px;color:#3ecf8e;font-weight:700;margin-left:6px">✓ ALL REQUIRED MAPPED</span></div>
+      <div class="card-sub">7 standard attributes mapped from HubSpot. <span style="color:#9977dd;cursor:pointer">View mapping →</span></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Activity writeback</div>
+      <div class="card-sub" style="margin-bottom:6px">What Harmony writes back to HubSpot. Applies to every agent using this connection.</div>
+      <div class="tog-row">
+        <div class="tog-row-text">
+          <div class="tog-row-name">Log call activities</div>
+          <div class="tog-row-desc">Each call attempt becomes a HubSpot engagement with disposition, duration, and recording link.</div>
+        </div>
+        <div class="tog on"><div class="tog-track"></div><div class="tog-knob"></div></div>
+      </div>
+      <div class="tog-row">
+        <div class="tog-row-text">
+          <div class="tog-row-name">Log sequence activities</div>
+          <div class="tog-row-desc">Sequence started, completed, and final outcome events written as engagements.</div>
+        </div>
+        <div class="tog on"><div class="tog-track"></div><div class="tog-knob"></div></div>
+      </div>
+      <div class="tog-row">
+        <div class="tog-row-text">
+          <div class="tog-row-name">Create custom fields</div>
+          <div class="tog-row-desc">Auto-create Harmony-prefixed contact properties: status, last outcome, meeting booked, attempt count.</div>
+        </div>
+        <div class="tog on"><div class="tog-track"></div><div class="tog-knob"></div></div>
+      </div>
+      <div class="tog-row">
+        <div class="tog-row-text">
+          <div class="tog-row-name">Trigger custom events</div>
+          <div class="tog-row-desc">Fire HubSpot custom events on key Harmony moments (interested, voicemail left, opted out).</div>
+        </div>
+        <div class="tog"><div class="tog-track"></div><div class="tog-knob"></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Wire up enrollment in HubSpot</div>
+      <div class="card-sub" style="margin-bottom:6px">Last step. Contacts enter Harmony through HubSpot workflow actions — set up at least one workflow to start receiving calls.</div>
+
+      <div class="checklist">
+        <div class="check-step">
+          <div class="check-num done">✓</div>
+          <div class="check-body">
+            <div class="check-title">Harmony app installed in HubSpot</div>
+            <div class="check-desc">Custom workflow actions <code>Harmony: Enroll in agent</code> and <code>Harmony: Cancel sequence</code> are available in your workflow builder.</div>
+          </div>
+        </div>
+        <div class="check-step">
+          <div class="check-num">2</div>
+          <div class="check-body">
+            <div class="check-title">Build a contact-based workflow</div>
+            <div class="check-desc">In HubSpot, create a workflow with your enrollment criteria (e.g., <em>Lifecycle = Lead AND Lead score ≥ 70</em>) and end it with the <code>Harmony: Enroll in agent</code> action. Pick which Harmony agent to enroll into.</div>
+            <div class="workflow-illus">
+              <span class="wf-node">Lifecycle = Lead</span>
+              <span class="wf-arr">→</span>
+              <span class="wf-node">Score ≥ 70</span>
+              <span class="wf-arr">→</span>
+              <span class="wf-node harmony">⌁ Harmony: Enroll in agent</span>
+            </div>
+            <div class="check-actions" style="margin-top:10px">
+              <button class="btn ghost-sm">Open HubSpot workflows ↗</button>
+              <button class="btn ghost-sm">Setup guide →</button>
+            </div>
+          </div>
+        </div>
+        <div class="check-step">
+          <div class="check-num">3</div>
+          <div class="check-body">
+            <div class="check-title">For unenrollment, use <code style="background:#1c1c2e;border:1px solid #2e2e42;border-radius:3px;padding:1px 6px;font-size:10px;color:#9977dd;font-family:monospace">Harmony: Cancel sequence</code></div>
+            <div class="check-desc">Add to a separate workflow that fires on opt-out, meeting booked, or any other stop condition. Harmony halts the active call sequence for that contact.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="await-bar">
+        <div class="await-pulse"></div>
+        <div><strong style="color:#e0b157">Awaiting first contact from HubSpot workflow.</strong> Once a workflow fires, you'll see "Last received" timestamps on every agent's enrollment screen.</div>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px">
+      <button class="btn ghost">Done — take me to my agents</button>
+      <button class="btn primary">Open HubSpot workflows ↗</button>
+    </div>
+  `);
+}
+
+render();
+</script>
+</body>
+</html>
