@@ -32,7 +32,7 @@ jobs:
         working-directory: ./telephony-onboarding
         run: |
           npx tsc -b
-          npx vite build --base=/telephony/
+          npx vite build --base=/mocks/telephony/
 
       - name: Copy telephony-onboarding into Pages root
         run: |
