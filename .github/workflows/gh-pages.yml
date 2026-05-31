@@ -39,6 +39,11 @@ jobs:
           mkdir -p dist/telephony
           cp -r telephony-onboarding/dist/. dist/telephony/
 
+      - name: Copy crm-integration into Pages root
+        run: |
+          mkdir -p dist/crm
+          cp crm-integration/index2.html  dist/crm/index.html
+
       # Upload dist/ as a Pages artifact
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
