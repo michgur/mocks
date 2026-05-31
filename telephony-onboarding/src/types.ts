@@ -105,13 +105,16 @@ export interface LegalEntity {
 
 export interface PhoneNumber {
   id: string
+  poolId: string
   number: string
   country: CountryCode
+  region?: string
   city?: string
   capabilities: ('voice' | 'sms' | 'mms')[]
   monthlyPrice: number
   purchasedAt: string
   callsLast30d: number
+  health: number // 0–100 reputation score; placeholder for now
   assignedServices: CapabilityType[]
 }
 
@@ -134,14 +137,23 @@ export interface Agent {
 }
 
 // A pool groups numbers and the policies that apply to them.
+// `targetComposition` is the maintained shape; only set when `autoRotation` is true.
+// In manual mode, the pool's numbers are whatever the user has explicitly provisioned.
+//
+// Incoming call routing:
+//   - inboundAgentId === null         → block incoming
+//   - inboundLastOutgoing === false   → route to inboundAgentId (fixed)
+//   - inboundLastOutgoing === true    → route to whichever agent last called the contact;
+//                                       inboundAgentId is the fallback for unknown contacts
 export interface Pool {
   id: string
   legalEntityId: string
   name: string
-  composition: CompositionRow[]
-  inboundAgentId: string | null // null = block incoming
+  inboundAgentId: string | null
+  inboundLastOutgoing: boolean
   outboundAgentIds: string[]
   autoRotation: boolean
+  targetComposition?: CompositionRow[]
   createdAt: string
   updatedAt: string
 }

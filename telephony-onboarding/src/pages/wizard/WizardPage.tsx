@@ -193,14 +193,15 @@ export function WizardPage() {
       const existingPools = await api.listPools(entityId)
       if (existingPools.length === 0 && state.composition.length > 0) {
         const agents = await api.listAgents()
-        await api.createPool({
+        const pool = await api.createPool({
           legalEntityId: entityId,
           name: 'My First Pool',
-          composition: state.composition,
           inboundAgentId: agents[0]?.id ?? null,
           outboundAgentIds: agents.map((a) => a.id),
           autoRotation: false,
         })
+        // Initial provisioning batch — composition is an order, not a stored target.
+        await api.provisionNumbers(pool.id, state.composition)
       }
     }
   }

@@ -82,10 +82,11 @@ export interface CreateCapabilityInput {
 export interface CreatePoolInput {
   legalEntityId: string
   name: string
-  composition: CompositionRow[]
   inboundAgentId: string | null
+  inboundLastOutgoing?: boolean
   outboundAgentIds: string[]
   autoRotation: boolean
+  targetComposition?: CompositionRow[]
 }
 
 export const api = {
@@ -187,32 +188,6 @@ export const api = {
     return structuredClone(store.numbers)
   },
 
-  async buyNumber(country: CountryCode): Promise<PhoneNumber> {
-    await delay(500)
-    const sample = sampleNumberByCountry(country)
-    const created: PhoneNumber = {
-      id: uid('pn'),
-      number: sample,
-      country,
-      city: country === 'US' ? 'Austin, TX' : country === 'UK' ? 'London' : '',
-      capabilities: ['voice', 'sms'],
-      monthlyPrice: country === 'UK' ? 1.0 : 1.15,
-      purchasedAt: new Date().toISOString(),
-      callsLast30d: 0,
-      assignedServices: [],
-    }
-    store.numbers.push(created)
-    // auto-assign eligible services
-    for (const c of store.capabilities) {
-      if (c.autoAssign && c.isApproved && isEligibleForCapability(created, c)) {
-        c.assignedNumberIds.push(created.id)
-        created.assignedServices.push(c.type)
-      }
-    }
-    store.notify()
-    return structuredClone(created)
-  },
-
   async releaseNumber(id: string): Promise<void> {
     await delay()
     store.numbers = store.numbers.filter((n) => n.id !== id)
@@ -220,6 +195,34 @@ export const api = {
       c.assignedNumberIds = c.assignedNumberIds.filter((nid) => nid !== id)
     }
     store.notify()
+  },
+
+  async provisionNumbers(poolId: string, composition: CompositionRow[]): Promise<PhoneNumber[]> {
+    await delay(500)
+    const created: PhoneNumber[] = []
+    for (const row of composition) {
+      for (let i = 0; i < row.count; i++) {
+        const num = createNumberInternal(poolId, row.country, row.region)
+        created.push(num)
+      }
+    }
+    store.notify()
+    return structuredClone(created)
+  },
+
+  async releaseAndReplace(numberId: string): Promise<PhoneNumber | null> {
+    await delay(500)
+    const existing = store.numbers.find((n) => n.id === numberId)
+    if (!existing) return null
+    // remove old
+    store.numbers = store.numbers.filter((n) => n.id !== numberId)
+    for (const c of store.capabilities) {
+      c.assignedNumberIds = c.assignedNumberIds.filter((nid) => nid !== numberId)
+    }
+    // acquire replacement with same shape
+    const replacement = createNumberInternal(existing.poolId, existing.country, existing.region)
+    store.notify()
+    return structuredClone(replacement)
   },
 
   async listAgents(): Promise<Agent[]> {
@@ -246,10 +249,11 @@ export const api = {
       id: uid('pool'),
       legalEntityId: input.legalEntityId,
       name: input.name,
-      composition: input.composition,
       inboundAgentId: input.inboundAgentId,
+      inboundLastOutgoing: input.inboundLastOutgoing ?? false,
       outboundAgentIds: input.outboundAgentIds,
       autoRotation: input.autoRotation,
+      targetComposition: input.targetComposition,
       createdAt: now,
       updatedAt: now,
     }
@@ -311,6 +315,32 @@ export function isEligibleForCapability(n: PhoneNumber, c: Capability): boolean 
   }
   if (c.type === 'business_profile') return true
   return false
+}
+
+function createNumberInternal(poolId: string, country: CountryCode, region?: string): PhoneNumber {
+  const num: PhoneNumber = {
+    id: uid('pn'),
+    poolId,
+    number: sampleNumberByCountry(country),
+    country,
+    region: region && region !== 'Any state' ? region : undefined,
+    capabilities: ['voice', 'sms'],
+    monthlyPrice: country === 'UK' ? 1.0 : 1.15,
+    purchasedAt: new Date().toISOString(),
+    callsLast30d: 0,
+    // Placeholder health: random 75–95 so fresh numbers feel healthy.
+    health: Math.floor(75 + Math.random() * 21),
+    assignedServices: [],
+  }
+  store.numbers.push(num)
+  // auto-assign eligible services
+  for (const c of store.capabilities) {
+    if (c.autoAssign && c.isApproved && isEligibleForCapability(num, c)) {
+      c.assignedNumberIds.push(num.id)
+      num.assignedServices.push(c.type)
+    }
+  }
+  return num
 }
 
 function sampleNumberByCountry(country: CountryCode): string {
