@@ -1,90 +1,148 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api } from '@/api/client'
-import type { Capability, CapabilityType, CountryCode } from '@/types'
-import { useEntityContext } from '@/state/EntityContext'
+import {
+  identityRequirementType,
+  type CapabilityKind,
+  type CountryCode,
+  type Requirement,
+  type RequirementType,
+} from '@/types'
+import { useCompanyContext } from '@/state/CompanyContext'
 import { WizardLayout } from './WizardLayout'
 import {
-  compositionCountries,
   computeVisibleSteps,
-  derivePlannedCapabilities,
   emptyWizardState,
-  STEP_TITLES,
+  plannedRequirementTypes,
   validateStep,
   type WizardFormState,
   type WizardStepId,
 } from './wizardState'
-import { RequirementsStep } from './steps/RequirementsStep'
-import { RequirementsCapabilityStep } from './steps/RequirementsCapabilityStep'
+import { ChannelsStep } from './steps/ChannelsStep'
 import { BusinessInfoStep } from './steps/BusinessInfoStep'
 import { AuthorizedRepStep } from './steps/AuthorizedRepStep'
 import { MessagingStep } from './steps/MessagingStep'
 import { CnamStep } from './steps/CnamStep'
 import { ReviewStep } from './steps/ReviewStep'
 
+const CREATED_BY = 'gur@harmony.ai'
+
+interface WizardConfig {
+  includeChannels: boolean
+  needIdentity: boolean
+  editing?: Requirement
+}
+
 export function WizardPage() {
   const navigate = useNavigate()
-  const { capabilityId } = useParams<{ capabilityId?: string }>()
+  const { requirementId } = useParams<{ requirementId?: string }>()
   const [searchParams] = useSearchParams()
-  const addType = searchParams.get('add') as CapabilityType | null
-  const newEntity = searchParams.get('new_entity') === '1'
-  // mode=capability means we entered from "Add capability" — skip composition / pool creation.
-  const capabilityMode = searchParams.get('mode') === 'capability'
-  const { currentEntity, setCurrentEntityId } = useEntityContext()
+  const capabilityParam = searchParams.get('capability') as CapabilityKind | null
+  const newCompanyParam = searchParams.get('new_company') === '1'
+  // Countries carried over from a reserved number roster, so onboarding opens
+  // pre-filled with the regions the user already asked for (still editable).
+  const countriesParam = searchParams.get('countries')
+  const prefillCountries = countriesParam
+    ? (countriesParam.split(',').filter(Boolean) as CountryCode[])
+    : null
+  const { currentCompany, setCurrentCompanyId, loading: companyLoading } = useCompanyContext()
 
   const [state, setState] = useState<WizardFormState>(emptyWizardState)
-  const [editingCapability, setEditingCapability] = useState<Capability | null>(null)
-  const [hydrated, setHydrated] = useState(false)
-  const [currentStep, setCurrentStep] = useState<WizardStepId>('requirements')
+  const [config, setConfig] = useState<WizardConfig | null>(null)
+  const [currentStep, setCurrentStep] = useState<WizardStepId>('channels')
   const [submitting, setSubmitting] = useState(false)
 
-  // Creating a new entity needs the business profile step regardless of capability picks.
-  const isCreatingEntity = newEntity || !currentEntity
-
-  // For editing: include requirements step only when this is a brand-new wizard.
-  const includeRequirements = !capabilityId && !addType
-  const steps = useMemo(
-    () => computeVisibleSteps(state, { includeRequirements }),
-    [state, includeRequirements]
-  )
-
-  // Hydrate state for edit / add modes.
+  // Configure the wizard once the company context has settled.
   useEffect(() => {
+    if (companyLoading || config) return
     let cancelled = false
-    const hydrate = async () => {
-      if (capabilityId) {
-        const cap = await api.getCapability(capabilityId)
-        if (!cancelled && cap) {
-          setEditingCapability(cap)
-          setState(stateFromCapability(cap))
-          // Focus first relevant step: rejected field's step, else first relevant step.
-          const firstStep = cap.rejection
-            ? mapFieldToStep(cap.rejection.field)
-            : computeVisibleSteps(stateFromCapability(cap), { includeRequirements: false })[0]
-          setCurrentStep(firstStep ?? 'review')
-          setHydrated(true)
+
+    const configure = async () => {
+      // ── Edit / fix an existing requirement ──────────────────────────────
+      if (requirementId) {
+        const req = await api.getRequirement(requirementId)
+        if (cancelled) return
+        if (!req) {
+          setConfig({ includeChannels: false, needIdentity: false })
+          setCurrentStep('review')
+          return
         }
-      } else if (addType) {
-        const isUSCap = addType === 'cnam' || addType === 'a2p_messaging' || addType === 'stir_shaken'
-        setState((s) => ({
-          ...s,
-          capabilities: [addType],
-          composition: isUSCap ? [{ country: 'US', count: 1 }] : s.composition,
-        }))
-        setCurrentStep(addType === 'cnam' ? 'cnam' : addType === 'a2p_messaging' ? 'messaging' : 'business')
-        setHydrated(true)
-      } else {
-        setHydrated(true)
+        const company = (await api.listCompanies()).find((c) => c.id === req.companyId)
+        if (cancelled) return
+        const country = company?.country ?? 'US'
+        const isIdentity = req.type === identityRequirementType(country)
+        const next: WizardFormState = {
+          country,
+          countries: company?.countries ?? [country],
+          capabilities: capabilitiesForRequirement(req.type),
+          business: req.data.business ?? {},
+          representative: req.data.representative ?? {},
+          messaging: req.data.messaging ?? {},
+          cnam: req.data.cnam ?? {},
+        }
+        const cfg: WizardConfig = { includeChannels: false, needIdentity: isIdentity, editing: req }
+        const visible = computeVisibleSteps(next, cfg)
+        setState(next)
+        setConfig(cfg)
+        setCurrentStep(
+          req.rejection ? mapFieldToStep(req.rejection.field) ?? visible[0] : visible[0]
+        )
+        return
       }
+
+      // ── Set up a single capability on an existing company ───────────────
+      if (capabilityParam && currentCompany) {
+        const country = currentCompany.country
+        const reqs = await api.listRequirements(currentCompany.id)
+        if (cancelled) return
+        const idType = identityRequirementType(country)
+        const needIdentity = !reqs.some((r) => r.type === idType)
+        const next: WizardFormState = {
+          ...emptyWizardState,
+          country,
+          countries: currentCompany.countries,
+          capabilities: [capabilityParam],
+        }
+        const cfg: WizardConfig = { includeChannels: false, needIdentity }
+        const visible = computeVisibleSteps(next, cfg)
+        setState(next)
+        setConfig(cfg)
+        setCurrentStep(visible[0])
+        return
+      }
+
+      // ── New company onboarding (channels-first) ─────────────────────────
+      setState((s) => {
+        const countries = prefillCountries ?? currentCompany?.countries ?? s.countries
+        return { ...s, country: countries[0] ?? 'US', countries }
+      })
+      setConfig({ includeChannels: true, needIdentity: true })
+      setCurrentStep('channels')
     }
-    hydrate()
+
+    configure()
     return () => {
       cancelled = true
     }
-  }, [capabilityId, addType])
+  }, [companyLoading, config, requirementId, capabilityParam, currentCompany])
 
-  if (!hydrated) {
-    return <div className="flex min-h-screen items-center justify-center text-muted-foreground">Loading…</div>
+  const steps = useMemo(
+    () =>
+      config
+        ? computeVisibleSteps(state, {
+            includeChannels: config.includeChannels,
+            needIdentity: config.needIdentity,
+          })
+        : [],
+    [state, config]
+  )
+
+  if (!config) {
+    return (
+      <div className="flex min-h-screen items-center justify-center text-muted-foreground">
+        Loading…
+      </div>
+    )
   }
 
   const update = (patch: Partial<WizardFormState>) => setState((s) => ({ ...s, ...patch }))
@@ -92,15 +150,11 @@ export function WizardPage() {
   const currentIndex = steps.indexOf(currentStep)
   const isLast = currentIndex === steps.length - 1
 
-  const onCancel = async () => {
-    // For new wizards we could persist a draft; for now just navigate home.
-    navigate('/business-registration')
-  }
-
+  const done = () => navigate('/capabilities')
+  const onCancel = () => done()
   const onBack = () => {
     if (currentIndex > 0) setCurrentStep(steps[currentIndex - 1])
   }
-
   const goToStep = (s: WizardStepId) => {
     if (steps.includes(s)) setCurrentStep(s)
   }
@@ -110,118 +164,82 @@ export function WizardPage() {
       setSubmitting(true)
       await submit()
       setSubmitting(false)
-      navigate('/business-registration')
+      done()
       return
     }
     setCurrentStep(steps[currentIndex + 1])
   }
 
   const submit = async () => {
-    if (editingCapability) {
-      await api.upsertCapability({
-        id: editingCapability.id,
-        legalEntityId: editingCapability.legalEntityId,
-        type: editingCapability.type,
-        countries: editingCapability.countries,
+    // Edit mode: re-upsert just the one requirement.
+    if (config.editing) {
+      await api.upsertRequirement({
+        id: config.editing.id,
+        companyId: config.editing.companyId,
+        type: config.editing.type,
         shouldSubmit: true,
-        dependencies: editingCapability.dependencies,
-        data: { ...collectStateData(state), submittedAt: new Date().toISOString() },
-        createdBy: editingCapability.createdBy,
+        data: dataForType(config.editing.type, state),
+        createdBy: config.editing.createdBy,
       })
       return
     }
 
-    // Resolve which entity these capabilities will belong to.
-    let entityId = currentEntity?.id
-    if (isCreatingEntity) {
-      const entityName = state.business.legalName?.trim() || 'New Entity'
-      const created = await api.createEntity(entityName)
-      entityId = created.id
-      setCurrentEntityId(created.id)
-    }
-    if (!entityId) return
-
-    // New wizard: create one capability per planned type, with linked dependencies.
-    const planned = derivePlannedCapabilities(state)
-    const ids: Partial<Record<CapabilityType, string>> = {}
-    // Submit business profile first so its ID can be set as a dependency.
-    const order: CapabilityType[] = [
-      'business_profile',
-      'country_bundle',
-      'stir_shaken',
-      'a2p_messaging',
-      'cnam',
-    ]
-    for (const t of order) {
-      if (!planned.includes(t)) continue
-      const isBundle = t === 'country_bundle'
-      const bundleCountries: CountryCode[] = compositionCountries(state.composition).filter(
-        (c) => c !== 'US' && c !== 'IL'
-      )
-      if (isBundle) {
-        for (const country of bundleCountries) {
-          const created = await api.upsertCapability({
-            legalEntityId: entityId,
-            type: 'country_bundle',
-            countries: [country],
-            shouldSubmit: true,
-            dependencies: [],
-            data: { bundle: { country }, representative: state.representative },
-            createdBy: 'gur@harmony.ai',
-          })
-          ids[`country_bundle_${country}` as unknown as CapabilityType] = created.id
-        }
-        continue
-      }
-      const dependsOnProfile = t !== 'business_profile'
-      const created = await api.upsertCapability({
-        legalEntityId: entityId,
-        type: t,
-        countries: t === 'business_profile' ? [] : ['US'],
-        shouldSubmit: true,
-        dependencies: dependsOnProfile && ids.business_profile ? [ids.business_profile] : [],
-        data: dataForType(t, state),
-        createdBy: 'gur@harmony.ai',
+    // Resolve (or create) the company these requirements belong to.
+    const isCreatingCompany = newCompanyParam || !currentCompany
+    let companyId = currentCompany?.id
+    if (isCreatingCompany) {
+      const created = await api.createCompany({
+        name: state.business.legalName?.trim() || 'New company',
+        country: state.country,
+        countries: state.countries,
       })
-      ids[t] = created.id
+      companyId = created.id
+      setCurrentCompanyId(created.id)
+    }
+    if (!companyId) return
+
+    const existing = await api.listRequirements(companyId)
+
+    // Ensure a foundation exists for every country in scope. Channels-first
+    // onboarding can span multiple countries (US → identity, others →
+    // country_bundle); targeted flows only touch the primary country.
+    const foundationTypes = config.includeChannels
+      ? Array.from(new Set(state.countries.map((c) => identityRequirementType(c))))
+      : [identityRequirementType(state.country)]
+    if (config.needIdentity) {
+      for (const t of foundationTypes) {
+        if (existing.some((r) => r.type === t)) continue
+        await api.upsertRequirement({
+          companyId,
+          type: t,
+          shouldSubmit: true,
+          data: dataForType(t, state),
+          createdBy: CREATED_BY,
+        })
+      }
     }
 
-    // Create the first pool for this entity if none exists yet, but only when we
-    // came in through the full setup flow. Capability-mode entries (Add capability)
-    // skip this — the user already has numbers and isn't ordering more.
-    if (!capabilityMode) {
-      const existingPools = await api.listPools(entityId)
-      if (existingPools.length === 0 && state.composition.length > 0) {
-        const agents = await api.listAgents()
-        const pool = await api.createPool({
-          legalEntityId: entityId,
-          name: 'My First Pool',
-          inboundAgentId: agents[0]?.id ?? null,
-          outboundAgentIds: agents.map((a) => a.id),
-          autoRotation: false,
-        })
-        // Initial provisioning batch — composition is an order, not a stored target.
-        await api.provisionNumbers(pool.id, state.composition)
-      }
+    // Create one requirement per planned regulated type (skip existing ones).
+    const after = await api.listRequirements(companyId)
+    for (const t of plannedRequirementTypes(state)) {
+      if (after.some((r) => r.type === t)) continue
+      await api.upsertRequirement({
+        companyId,
+        type: t,
+        shouldSubmit: true,
+        data: dataForType(t, state),
+        createdBy: CREATED_BY,
+      })
     }
   }
 
-  // Disable Next if validation fails
   const stepErrors = validateStep(state, currentStep)
   const nextDisabled = stepErrors.length > 0 || submitting
 
-  const insertMockData = () => {
+  const insertMockData = () =>
     setState((s) => ({
       ...s,
-      composition:
-        s.composition.length > 0
-          ? s.composition
-          : [
-              { country: 'US', region: 'California', count: 4 },
-              { country: 'US', region: 'New York', count: 3 },
-            ],
-      capabilities:
-        s.capabilities.length > 0 ? s.capabilities : ['stir_shaken', 'a2p_messaging', 'cnam'],
+      capabilities: s.capabilities.length > 0 ? s.capabilities : ['calling', 'texting', 'branded_caller_id'],
       business: {
         legalName: 'Acme Inc.',
         registrationType: 'EIN',
@@ -230,7 +248,7 @@ export function WizardPage() {
         city: 'San Francisco',
         state: 'CA',
         postalCode: '94103',
-        country: 'US',
+        country: s.country,
         companyType: 'LLC',
         businessType: 'For-profit',
         industry: 'Healthcare',
@@ -251,7 +269,8 @@ export function WizardPage() {
       },
       cnam: { displayName: 'Acme' },
     }))
-  }
+
+  const editingType = config.editing?.type
 
   return (
     <WizardLayout
@@ -264,20 +283,19 @@ export function WizardPage() {
       nextDisabled={nextDisabled}
       onInsertMockData={insertMockData}
     >
-      {currentStep === 'requirements' &&
-        (capabilityMode ? (
-          <RequirementsCapabilityStep state={state} update={update} />
-        ) : (
-          <RequirementsStep state={state} update={update} />
-        ))}
+      {currentStep === 'channels' && (
+        <ChannelsStep
+          state={state}
+          update={update}
+          lockCountry={!!currentCompany && !newCompanyParam && !prefillCountries}
+        />
+      )}
       {currentStep === 'business' && (
         <BusinessInfoStep
           state={state}
           update={update}
-          rejectionField={editingCapability?.rejection?.field}
-          rejectionMessage={
-            editingCapability?.type === 'business_profile' ? editingCapability.rejection?.message : undefined
-          }
+          rejectionField={config.editing?.rejection?.field}
+          rejectionMessage={editingType === identityRequirementType(state.country) ? config.editing?.rejection?.message : undefined}
         />
       )}
       {currentStep === 'representative' && <AuthorizedRepStep state={state} update={update} />}
@@ -286,13 +304,15 @@ export function WizardPage() {
         <CnamStep
           state={state}
           update={update}
-          rejectionMessage={editingCapability?.type === 'cnam' ? editingCapability.rejection?.message : undefined}
-          rejectionField={editingCapability?.type === 'cnam' ? editingCapability.rejection?.field : undefined}
+          rejectionMessage={editingType === 'cnam' ? config.editing?.rejection?.message : undefined}
+          rejectionField={editingType === 'cnam' ? config.editing?.rejection?.field : undefined}
         />
       )}
-      {currentStep === 'review' && <ReviewStep state={state} goToStep={goToStep} />}
+      {currentStep === 'review' && (
+        <ReviewStep state={state} goToStep={goToStep} showIdentity={config.needIdentity} />
+      )}
 
-      {STEP_TITLES[currentStep] && stepErrors.length > 0 && currentStep !== 'requirements' && (
+      {currentStep !== 'channels' && currentStep !== 'review' && stepErrors.length > 0 && (
         <div className="mt-6 text-xs text-muted-foreground">
           Fill in all required fields to continue.
         </div>
@@ -301,39 +321,31 @@ export function WizardPage() {
   )
 }
 
-function stateFromCapability(c: Capability): WizardFormState {
-  const d = c.data as WizardFormState & Record<string, unknown>
-  return {
-    composition: c.countries.map((country) => ({ country, count: 1 })),
-    capabilities: [c.type],
-    business: (d.business as WizardFormState['business']) ?? {},
-    representative: (d.representative as WizardFormState['representative']) ?? {},
-    messaging: (d.messaging as WizardFormState['messaging']) ?? {},
-    cnam: (d.cnam as WizardFormState['cnam']) ?? {},
-    bundles: (d.bundles as WizardFormState['bundles']) ?? {},
-  }
-}
-
-function collectStateData(state: WizardFormState): Record<string, unknown> {
-  return {
-    business: state.business,
-    representative: state.representative,
-    messaging: state.messaging,
-    cnam: state.cnam,
-    bundles: state.bundles,
-  }
-}
-
-function dataForType(t: CapabilityType, state: WizardFormState): Record<string, unknown> {
-  switch (t) {
-    case 'business_profile':
-      return { business: state.business, representative: state.representative }
+function capabilitiesForRequirement(type: RequirementType): CapabilityKind[] {
+  switch (type) {
+    case 'a2p_messaging':
+      return ['texting']
     case 'cnam':
-      return { cnam: state.cnam }
+      return ['branded_caller_id']
+    case 'stir_shaken':
+      return ['calling']
+    case 'sender_id':
+      return ['alphanumeric_sender_id']
+    case 'identity':
+    case 'country_bundle':
+      return []
+  }
+}
+
+function dataForType(t: RequirementType, state: WizardFormState): Record<string, unknown> {
+  switch (t) {
+    case 'identity':
+    case 'country_bundle':
+      return { business: state.business, representative: state.representative }
     case 'a2p_messaging':
       return { messaging: state.messaging }
-    case 'stir_shaken':
-      return {}
+    case 'cnam':
+      return { cnam: state.cnam }
     default:
       return {}
   }

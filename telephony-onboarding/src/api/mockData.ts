@@ -1,44 +1,41 @@
-import type { Agent, Capability, LegalEntity, PhoneNumber, Pool } from '@/types'
+import type {
+  Agent,
+  Company,
+  ImportableNumber,
+  PhoneNumber,
+  Provision,
+  ProviderConnection,
+  Requirement,
+} from '@/types'
 
-export const seedEntities: LegalEntity[] = [
-  { id: 'ent_acme', name: 'Acme Inc.', createdAt: '2026-04-10T14:00:00Z' },
-  { id: 'ent_acme_eu', name: 'Acme Europe Ltd.', createdAt: '2026-04-20T09:00:00Z' },
-]
-
-// Agents in this product are AI agents. Account-level — they don't belong to a legal entity.
-export const seedAgents: Agent[] = [
-  { id: 'agent_sales', name: 'Sales Agent' },
-  { id: 'agent_support', name: 'Support Agent' },
-]
-
-// Seed includes a pool for Acme Inc so the Numbers page has content out of the gate.
-// The wizard's "create first pool" logic only fires when no pool exists for the entity,
-// so this doesn't conflict with the onboarding flow.
-export const seedPools: Pool[] = [
+export const seedCompanies: Company[] = [
   {
-    id: 'pool_acme_default',
-    legalEntityId: 'ent_acme',
-    name: 'My First Pool',
-    inboundAgentId: 'agent_sales',
-    inboundLastOutgoing: false,
-    outboundAgentIds: ['agent_sales', 'agent_support'],
-    autoRotation: false,
-    createdAt: '2026-04-20T10:00:00Z',
-    updatedAt: '2026-04-20T10:00:00Z',
+    id: 'co_acme',
+    name: 'Acme Inc.',
+    country: 'US',
+    countries: ['US', 'UK'],
+    mode: 'managed',
+    createdAt: '2026-04-10T14:00:00Z',
   },
 ]
 
-// Demo seed - exercises every status type from the PRD's dashboard mock.
-export const seedCapabilities: Capability[] = [
+// Agents belong to a Company and own their own numbers.
+export const seedAgents: Agent[] = [
+  { id: 'agent_sales', name: 'Sales Agent', companyId: 'co_acme', autoRotate: true, blockIncoming: false },
+  { id: 'agent_support', name: 'Support Agent', companyId: 'co_acme', autoRotate: false, blockIncoming: true },
+]
+
+// One requirement per regulatory artifact. Seed exercises a range of states:
+// identity approved, calling (STIR/SHAKEN) approved, Caller ID Name (CNAM)
+// rejected. Texting (A2P) is intentionally absent so it reads as "not set up".
+export const seedRequirements: Requirement[] = [
   {
-    id: 'cap_bp_1',
-    legalEntityId: 'ent_acme',
-    type: 'business_profile',
-    countries: [],
+    id: 'req_identity',
+    companyId: 'co_acme',
+    type: 'identity',
     status: 'approved',
     isApproved: true,
     twilioResourceSids: ['BU0000000000000000000000000000001'],
-    dependencies: [],
     data: {
       business: {
         legalName: 'Acme Inc.',
@@ -52,7 +49,7 @@ export const seedCapabilities: Capability[] = [
         companyType: 'LLC',
         businessType: 'For-profit',
         industry: 'Healthcare',
-        regionsOfOperation: ['United States', 'Europe'],
+        regionsOfOperation: ['United States'],
         website: 'https://acme.example',
       },
       representative: {
@@ -67,20 +64,28 @@ export const seedCapabilities: Capability[] = [
     createdBy: 'gur@harmony.ai',
     createdAt: '2026-04-10T14:00:00Z',
     updatedAt: '2026-04-14T09:21:00Z',
-    autoAssign: true,
-    assignedNumberIds: ['pn_us_1', 'pn_us_2'],
   },
   {
-    id: 'cap_cnam_1',
-    legalEntityId: 'ent_acme',
+    id: 'req_stir',
+    companyId: 'co_acme',
+    type: 'stir_shaken',
+    status: 'approved',
+    isApproved: true,
+    twilioResourceSids: ['ST0000000000000000000000000000001'],
+    data: {},
+    createdBy: 'gur@harmony.ai',
+    createdAt: '2026-04-10T14:05:00Z',
+    updatedAt: '2026-04-13T16:00:00Z',
+  },
+  {
+    id: 'req_cnam',
+    companyId: 'co_acme',
     type: 'cnam',
-    countries: ['US'],
     status: 'rejected',
     isApproved: false,
     twilioResourceSids: ['CN0000000000000000000000000000001'],
-    dependencies: ['cap_bp_1'],
     rejection: {
-      message: 'The CNAM Display name entered is unrelated to your registered business name.',
+      message: 'The CNAM display name entered is unrelated to your registered business name.',
       field: 'displayName',
       code: '30799',
       explanation:
@@ -90,136 +95,80 @@ export const seedCapabilities: Capability[] = [
     createdBy: 'gur@harmony.ai',
     createdAt: '2026-04-11T10:00:00Z',
     updatedAt: '2026-04-14T11:05:00Z',
-    autoAssign: true,
-    assignedNumberIds: [],
-  },
-  {
-    id: 'cap_a2p_1',
-    legalEntityId: 'ent_acme',
-    type: 'a2p_messaging',
-    countries: ['US'],
-    status: 'in_review',
-    isApproved: false,
-    twilioResourceSids: ['BN0000000000000000000000000000001', 'CM0000000000000000000000000000001'],
-    dependencies: ['cap_bp_1'],
-    data: {
-      messaging: {
-        privacyPolicyUrl: 'https://acme.example/privacy',
-        termsOfServiceUrl: 'https://acme.example/terms',
-      },
-    },
-    createdBy: 'gur@harmony.ai',
-    createdAt: '2026-04-14T08:30:00Z',
-    updatedAt: '2026-04-14T08:30:00Z',
-    autoAssign: true,
-    assignedNumberIds: [],
-  },
-  {
-    id: 'cap_stir_1',
-    legalEntityId: 'ent_acme',
-    type: 'stir_shaken',
-    countries: ['US'],
-    status: 'approved',
-    isApproved: true,
-    twilioResourceSids: ['ST0000000000000000000000000000001'],
-    dependencies: ['cap_bp_1'],
-    data: {},
-    createdBy: 'gur@harmony.ai',
-    createdAt: '2026-04-10T14:05:00Z',
-    updatedAt: '2026-04-13T16:00:00Z',
-    autoAssign: true,
-    assignedNumberIds: ['pn_us_1', 'pn_us_2'],
-  },
-  {
-    id: 'cap_uk_bundle_1',
-    legalEntityId: 'ent_acme',
-    type: 'country_bundle',
-    countries: ['UK'],
-    status: 'draft',
-    isApproved: false,
-    twilioResourceSids: [],
-    dependencies: [],
-    data: {
-      bundle: { country: 'UK' },
-      representative: {
-        firstName: 'Jamie',
-        lastName: 'Chen',
-        email: 'jamie@acme.example',
-      },
-    },
-    createdBy: 'gur@harmony.ai',
-    createdAt: '2026-04-20T09:00:00Z',
-    updatedAt: '2026-04-20T09:14:00Z',
-    autoAssign: true,
-    assignedNumberIds: [],
-  },
-  {
-    id: 'cap_bp_eu',
-    legalEntityId: 'ent_acme_eu',
-    type: 'business_profile',
-    countries: [],
-    status: 'in_review',
-    isApproved: false,
-    twilioResourceSids: ['BU0000000000000000000000000000002'],
-    dependencies: [],
-    data: {
-      business: {
-        legalName: 'Acme Europe Ltd.',
-        registrationType: 'Other',
-        registrationNumber: 'GB123456789',
-        addressLine1: '1 Finsbury Ave',
-        city: 'London',
-        postalCode: 'EC2M 2PF',
-        country: 'UK',
-        companyType: 'Corporation',
-        businessType: 'For-profit',
-        industry: 'Technology',
-        website: 'https://acme.example',
-      },
-      representative: {
-        firstName: 'Priya',
-        lastName: 'Patel',
-        email: 'priya@acme.example',
-        phone: '+442079461212',
-        title: 'Director',
-        position: 'Authorized Representative',
-      },
-    },
-    createdBy: 'gur@harmony.ai',
-    createdAt: '2026-04-20T09:00:00Z',
-    updatedAt: '2026-04-20T09:00:00Z',
-    autoAssign: true,
-    assignedNumberIds: [],
   },
 ]
 
 export const seedNumbers: PhoneNumber[] = [
   {
     id: 'pn_us_1',
-    poolId: 'pool_acme_default',
+    agentId: 'agent_sales',
     number: '+1 (415) 555-0142',
     country: 'US',
     region: 'California',
     city: 'San Francisco, CA',
-    capabilities: ['voice', 'sms', 'mms'],
-    monthlyPrice: 1.15,
-    purchasedAt: '2026-04-15T10:00:00Z',
-    callsLast30d: 1284,
     health: 92,
-    assignedServices: ['business_profile', 'stir_shaken'],
+    status: 'active',
+    source: 'managed',
+    twilioSid: 'PN0000000000000000000000000000001',
+    callsLast30d: 1284,
+    acquiredAt: '2026-04-15T10:00:00Z',
   },
   {
     id: 'pn_us_2',
-    poolId: 'pool_acme_default',
-    number: '+1 (212) 555-0188',
+    agentId: 'agent_sales',
+    number: '+1 (415) 555-0188',
+    country: 'US',
+    region: 'California',
+    city: 'San Francisco, CA',
+    // Spam-labeled: low health with screenshot evidence behind the (i) icon.
+    health: 38,
+    spamScreenshotUrl: 'https://placehold.co/320x600/1f1f23/f87171?text=Spam+Likely%0A%0AT-Mobile+caller+ID',
+    status: 'active',
+    source: 'managed',
+    twilioSid: 'PN0000000000000000000000000000002',
+    callsLast30d: 642,
+    acquiredAt: '2026-04-18T10:00:00Z',
+  },
+  {
+    id: 'pn_us_3',
+    agentId: 'agent_support',
+    number: '+1 (212) 555-0173',
     country: 'US',
     region: 'New York',
     city: 'New York, NY',
-    capabilities: ['voice', 'sms'],
-    monthlyPrice: 1.15,
-    purchasedAt: '2026-04-18T10:00:00Z',
-    callsLast30d: 412,
-    health: 78,
-    assignedServices: ['business_profile', 'stir_shaken'],
+    health: 81,
+    status: 'active',
+    source: 'managed',
+    twilioSid: 'PN0000000000000000000000000000003',
+    callsLast30d: 219,
+    acquiredAt: '2026-04-20T10:00:00Z',
   },
+]
+
+// An in-flight acquisition that's blocked on Company verification — surfaced as
+// "Waiting on verification" on the agent screen.
+export const seedProvisions: Provision[] = [
+  {
+    id: 'prov_1',
+    agentId: 'agent_support',
+    spec: { count: 2, region: 'New York' },
+    status: 'pending',
+    acquiredNumberIds: [],
+    createdAt: '2026-04-21T09:00:00Z',
+  },
+]
+
+export const seedConnections: ProviderConnection[] = []
+
+// The pool of numbers we pretend to find in a freshly connected Twilio account.
+// The import modal lists these (minus any already linked) for the user to pick.
+export const mockImportableNumbers: ImportableNumber[] = [
+  { number: '+1 (415) 555-0220', country: 'US', region: 'California' },
+  { number: '+1 (415) 555-0231', country: 'US', region: 'California' },
+  { number: '+1 (212) 555-0144', country: 'US', region: 'New York' },
+  { number: '+1 (312) 555-0199', country: 'US', region: 'Illinois' },
+  { number: '+1 (512) 555-0107', country: 'US', region: 'Texas' },
+  { number: '+1 (206) 555-0162', country: 'US', region: 'Washington' },
+  { number: '+44 20 7946 0321', country: 'UK' },
+  { number: '+44 20 7946 0388', country: 'UK' },
 ]

@@ -22,20 +22,11 @@ export function DevToolbar() {
               size="sm"
               variant="outline"
               onClick={async () => {
-                // Approve the rejected CNAM (demo of fixing a rejection)
-                await api._simulateStatus('cap_cnam_1', 'approved')
+                // Approve the rejected Caller ID Name (demo of fixing a rejection)
+                await api._simulateRequirementStatus('req_cnam', 'approved')
               }}
             >
-              Approve rejected CNAM
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={async () => {
-                await api._simulateStatus('cap_a2p_1', 'approved')
-              }}
-            >
-              Approve in-review A2P
+              Approve rejected Caller ID Name
             </Button>
           </div>
         </div>

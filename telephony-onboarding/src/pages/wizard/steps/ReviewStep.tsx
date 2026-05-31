@@ -1,18 +1,16 @@
 import { Button } from '@/components/ui/button'
-import {
-  CAPABILITY_LABELS,
-  COUNTRY_LABELS,
-  type CapabilityType,
-} from '@/types'
-import { compositionCountries, derivePlannedCapabilities, type WizardFormState, type WizardStepId } from '../wizardState'
+import { COUNTRY_LABELS } from '@/types'
+import { type WizardFormState, type WizardStepId } from '../wizardState'
 
 interface Props {
   state: WizardFormState
   goToStep: (s: WizardStepId) => void
+  showIdentity: boolean
 }
 
-export function ReviewStep({ state, goToStep }: Props) {
-  const planned = derivePlannedCapabilities(state)
+export function ReviewStep({ state, goToStep, showIdentity }: Props) {
+  const showMessaging = state.capabilities.includes('texting') && state.countries.includes('US')
+  const showCnam = state.capabilities.includes('branded_caller_id')
 
   return (
     <div>
@@ -22,28 +20,20 @@ export function ReviewStep({ state, goToStep }: Props) {
       </p>
 
       <div className="mt-6 space-y-3">
-        <ReviewCard title="Capabilities" onEdit={() => goToStep('requirements')}>
-          <ul className="space-y-1">
-            {planned.map((t) => (
-              <li key={t} className="text-sm">
-                <span className="font-medium">{CAPABILITY_LABELS[t]}</span>
-                {pluralCountriesForType(t, state) && (
-                  <span className="text-muted-foreground"> · {pluralCountriesForType(t, state)}</span>
-                )}
-              </li>
-            ))}
-          </ul>
-        </ReviewCard>
-
-        {needsStep(planned, ['business_profile', 'cnam', 'a2p_messaging', 'stir_shaken', 'country_bundle']) && (
+        {showIdentity && (
           <ReviewCard title="Business information" onEdit={() => goToStep('business')}>
             <Row label="Legal name" value={state.business.legalName} />
-            <Row label="Registration" value={`${state.business.registrationType ?? ''} ${state.business.registrationNumber ?? ''}`.trim()} />
+            <Row
+              label="Registration"
+              value={`${state.business.registrationType ?? ''} ${state.business.registrationNumber ?? ''}`.trim()}
+            />
             <Row
               label="Address"
               value={[
                 state.business.addressLine1,
-                [state.business.city, state.business.state, state.business.postalCode].filter(Boolean).join(', '),
+                [state.business.city, state.business.state, state.business.postalCode]
+                  .filter(Boolean)
+                  .join(', '),
                 state.business.country && COUNTRY_LABELS[state.business.country],
               ]
                 .filter(Boolean)
@@ -55,23 +45,26 @@ export function ReviewStep({ state, goToStep }: Props) {
           </ReviewCard>
         )}
 
-        {needsStep(planned, ['business_profile', 'country_bundle']) && (
+        {showIdentity && (
           <ReviewCard title="Authorized representative" onEdit={() => goToStep('representative')}>
-            <Row label="Name" value={`${state.representative.firstName ?? ''} ${state.representative.lastName ?? ''}`.trim()} />
+            <Row
+              label="Name"
+              value={`${state.representative.firstName ?? ''} ${state.representative.lastName ?? ''}`.trim()}
+            />
             <Row label="Email" value={state.representative.email} />
             <Row label="Phone" value={state.representative.phone} />
             <Row label="Title" value={state.representative.title} />
           </ReviewCard>
         )}
 
-        {planned.includes('a2p_messaging') && (
-          <ReviewCard title="Messaging" onEdit={() => goToStep('messaging')}>
+        {showMessaging && (
+          <ReviewCard title="Text messaging" onEdit={() => goToStep('messaging')}>
             <Row label="Privacy policy" value={state.messaging.privacyPolicyUrl} />
             <Row label="Terms of service" value={state.messaging.termsOfServiceUrl} />
           </ReviewCard>
         )}
 
-        {planned.includes('cnam') && (
+        {showCnam && (
           <ReviewCard title="Caller ID name" onEdit={() => goToStep('cnam')}>
             <Row label="Display name" value={state.cnam.displayName} />
           </ReviewCard>
@@ -81,9 +74,9 @@ export function ReviewStep({ state, goToStep }: Props) {
       <div className="mt-6 rounded-lg border bg-muted/30 p-4 text-sm">
         <div className="font-medium">What happens next</div>
         <ul className="mt-2 list-disc pl-5 text-muted-foreground space-y-1">
-          <li>We submit your registrations to carriers and Twilio.</li>
-          <li>Most approvals take 1–7 business days. You'll get an email when each one updates.</li>
-          <li>You can buy numbers now — approved capabilities auto-assign as they come in.</li>
+          <li>We register your business identity, then each capability, with the carriers.</li>
+          <li>Most approvals take 1–7 business days. You'll get an email as each one updates.</li>
+          <li>You can add numbers now — capabilities turn on automatically as approvals land.</li>
         </ul>
       </div>
     </div>
@@ -116,22 +109,9 @@ function Row({ label, value }: { label: string; value?: string }) {
   return (
     <div className="flex items-baseline gap-3 text-sm">
       <div className="w-36 shrink-0 text-muted-foreground">{label}</div>
-      <div className="flex-1 font-medium">{value || <span className="text-muted-foreground italic">Not provided</span>}</div>
+      <div className="flex-1 font-medium">
+        {value || <span className="text-muted-foreground italic">Not provided</span>}
+      </div>
     </div>
   )
-}
-
-function needsStep(planned: CapabilityType[], any: CapabilityType[]) {
-  return any.some((t) => planned.includes(t))
-}
-
-function pluralCountriesForType(t: CapabilityType, s: WizardFormState): string {
-  if (t === 'country_bundle') {
-    return compositionCountries(s.composition)
-      .filter((c) => c !== 'US' && c !== 'IL')
-      .map((c) => COUNTRY_LABELS[c])
-      .join(', ')
-  }
-  if (t === 'cnam' || t === 'a2p_messaging' || t === 'stir_shaken') return 'United States'
-  return ''
 }

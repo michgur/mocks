@@ -1,18 +1,17 @@
 import {
-  capabilityCountries,
-  requiresBundle,
+  identityRequirementType,
+  requirementsForCapability,
   type AuthorizedRepData,
   type BusinessProfileData,
-  type CapabilityType,
+  type CapabilityKind,
   type CnamData,
-  type CompositionRow,
-  type CountryBundleData,
   type CountryCode,
   type MessagingData,
+  type RequirementType,
 } from '@/types'
 
 export type WizardStepId =
-  | 'requirements'
+  | 'channels'
   | 'business'
   | 'representative'
   | 'messaging'
@@ -20,93 +19,58 @@ export type WizardStepId =
   | 'review'
 
 export interface WizardFormState {
-  composition: CompositionRow[]
-  capabilities: CapabilityType[]
+  // `country` is the primary country (drives the identity / requirement mix);
+  // `countries` is the full set the company's contacts are located in.
+  country: CountryCode
+  countries: CountryCode[]
+  capabilities: CapabilityKind[]
   business: BusinessProfileData
   representative: AuthorizedRepData
   messaging: MessagingData
   cnam: CnamData
-  bundles: Record<string, CountryBundleData>
 }
 
 export const emptyWizardState: WizardFormState = {
-  composition: [],
-  // All requirements capabilities are on by default; the user opts out per row.
-  capabilities: ['stir_shaken', 'a2p_messaging', 'cnam'],
+  country: 'US',
+  countries: ['US'],
+  capabilities: ['calling', 'texting', 'branded_caller_id', 'caller_id_passthrough'],
   business: {},
   representative: {},
   messaging: {},
   cnam: {},
-  bundles: {},
 }
 
-/** Unique set of countries derived from the composition rows. */
-export function compositionCountries(composition: CompositionRow[]): CountryCode[] {
-  return Array.from(new Set(composition.map((c) => c.country)))
+interface VisibleStepOpts {
+  includeChannels: boolean
+  needIdentity: boolean // whether the business/rep (identity) steps are needed
 }
 
-/**
- * Decide which steps are visible based on selected capabilities + composition countries.
- * Requirements step is only shown for new wizards (controlled by caller).
- *
- * A capability is "effectively selected" only if it's both ticked AND has at least one
- * country it applies to. Capabilities hidden from the requirements UI (because no relevant
- * country is selected) are treated as unselected.
- */
-export function computeVisibleSteps(
-  state: WizardFormState,
-  opts: { includeRequirements: boolean }
-): WizardStepId[] {
+export function computeVisibleSteps(state: WizardFormState, opts: VisibleStepOpts): WizardStepId[] {
   const steps: WizardStepId[] = []
-  if (opts.includeRequirements) steps.push('requirements')
-
-  const isSelected = (t: CapabilityType) => effectivelySelected(state, t)
-
-  const countries = compositionCountries(state.composition)
-  const needsBundle = countries.some(requiresBundle)
-  const needsBusiness =
-    isSelected('business_profile') ||
-    isSelected('cnam') ||
-    isSelected('a2p_messaging') ||
-    isSelected('stir_shaken') ||
-    needsBundle
-
-  const needsRep = needsBusiness || needsBundle
-  const needsMessaging = isSelected('a2p_messaging')
-  const needsCnam = isSelected('cnam')
-
-  if (needsBusiness) steps.push('business')
-  if (needsRep) steps.push('representative')
-  if (needsMessaging) steps.push('messaging')
-  if (needsCnam) steps.push('cnam')
+  if (opts.includeChannels) steps.push('channels')
+  if (opts.needIdentity) {
+    steps.push('business')
+    steps.push('representative')
+  }
+  if (state.capabilities.includes('texting') && state.countries.includes('US')) steps.push('messaging')
+  if (state.capabilities.includes('branded_caller_id')) steps.push('cnam')
   steps.push('review')
   return steps
 }
 
-function effectivelySelected(state: WizardFormState, type: CapabilityType): boolean {
-  if (!state.capabilities.includes(type)) return false
-  if (type === 'business_profile') return true
-  const countries = compositionCountries(state.composition)
-  if (type === 'country_bundle') return countries.some(requiresBundle)
-  return capabilityCountries(type, countries).length > 0
-}
-
 export const STEP_TITLES: Record<WizardStepId, string> = {
-  requirements: 'Numbers you need',
+  channels: 'Capabilities',
   business: 'Business information',
   representative: 'Authorized representative',
-  messaging: 'Messaging',
+  messaging: 'Text messaging',
   cnam: 'Caller ID name',
   review: 'Review',
 }
 
-/** Validate one step. Returns the set of invalid field keys (empty = step is valid). */
 export function validateStep(state: WizardFormState, step: WizardStepId): string[] {
   switch (step) {
-    case 'requirements':
-      if (state.composition.length === 0) return ['composition']
-      if (state.composition.some((c) => c.count <= 0)) return ['count']
-      return []
+    case 'channels':
+      return state.capabilities.length === 0 ? ['capabilities'] : []
     case 'business': {
       const b = state.business
       const required: (keyof BusinessProfileData)[] = [
@@ -139,24 +103,18 @@ export function validateStep(state: WizardFormState, step: WizardStepId): string
   }
 }
 
-/**
- * Derive the actual capability types we'll create from composition + capability selection.
- * A non-US country in composition brings in a country bundle. US capabilities require a
- * business profile.
- */
-export function derivePlannedCapabilities(state: WizardFormState): CapabilityType[] {
-  const types = new Set<CapabilityType>()
-  for (const t of state.capabilities) {
-    if (effectivelySelected(state, t)) types.add(t)
+// The regulated requirement types we'll create from the selected capabilities,
+// across every country the company operates in.
+export function plannedRequirementTypes(state: WizardFormState): RequirementType[] {
+  const types = new Set<RequirementType>()
+  for (const kind of state.capabilities) {
+    for (const c of state.countries) {
+      for (const t of requirementsForCapability(kind, c)) types.add(t)
+    }
   }
-  const countries = compositionCountries(state.composition)
-  if (countries.some(requiresBundle)) types.add('country_bundle')
-  const hasUSCapability =
-    types.has('cnam') ||
-    types.has('a2p_messaging') ||
-    types.has('stir_shaken') ||
-    types.has('caller_id_passthrough') ||
-    types.has('branded_calls')
-  if (hasUSCapability) types.add('business_profile')
   return Array.from(types)
+}
+
+export function identityType(state: WizardFormState): RequirementType {
+  return identityRequirementType(state.country)
 }

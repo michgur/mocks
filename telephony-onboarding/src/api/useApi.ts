@@ -1,143 +1,102 @@
 import { useEffect, useState } from 'react'
 import { api, store } from './client'
-import type { Agent, Capability, LegalEntity, PhoneNumber, Pool } from '@/types'
+import type {
+  Agent,
+  CapabilityView,
+  Company,
+  ImportableNumber,
+  PhoneNumber,
+  Provision,
+  ProviderConnection,
+  Requirement,
+} from '@/types'
 
-export function useCapabilities(entityId?: string) {
-  const [capabilities, setCapabilities] = useState<Capability[]>([])
+// Subscribe a loader to the store so every mutation re-runs it.
+function useStoreData<T>(load: () => Promise<T>, deps: unknown[], initial: T) {
+  const [data, setData] = useState<T>(initial)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let cancelled = false
-    const load = async () => {
-      const result = await api.listCapabilities(entityId)
-      if (!cancelled) {
-        setCapabilities(result)
-        setLoading(false)
-      }
-    }
-    load()
-    const unsub = store.subscribe(() => {
-      api.listCapabilities(entityId).then((r) => {
-        if (!cancelled) setCapabilities(r)
+    const run = () =>
+      load().then((r) => {
+        if (!cancelled) {
+          setData(r)
+          setLoading(false)
+        }
       })
-    })
+    run()
+    const unsub = store.subscribe(run)
     return () => {
       cancelled = true
       unsub()
     }
-  }, [entityId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps)
 
-  return { capabilities, loading }
+  return { data, loading }
 }
 
-export function useNumbers() {
-  const [numbers, setNumbers] = useState<PhoneNumber[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    let cancelled = false
-    const load = async () => {
-      const result = await api.listNumbers()
-      if (!cancelled) {
-        setNumbers(result)
-        setLoading(false)
-      }
-    }
-    load()
-    const unsub = store.subscribe(() => {
-      api.listNumbers().then((r) => {
-        if (!cancelled) setNumbers(r)
-      })
-    })
-    return () => {
-      cancelled = true
-      unsub()
-    }
-  }, [])
-
-  return { numbers, loading }
+export function useCompanies() {
+  const { data, loading } = useStoreData<Company[]>(() => api.listCompanies(), [], [])
+  return { companies: data, loading }
 }
 
-export function useAgents() {
-  const [agents, setAgents] = useState<Agent[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    let cancelled = false
-    const load = async () => {
-      const result = await api.listAgents()
-      if (!cancelled) {
-        setAgents(result)
-        setLoading(false)
-      }
-    }
-    load()
-    const unsub = store.subscribe(() => {
-      api.listAgents().then((r) => {
-        if (!cancelled) setAgents(r)
-      })
-    })
-    return () => {
-      cancelled = true
-      unsub()
-    }
-  }, [])
-
-  return { agents, loading }
+export function useRequirements(companyId?: string) {
+  const { data, loading } = useStoreData<Requirement[]>(
+    () => api.listRequirements(companyId),
+    [companyId],
+    []
+  )
+  return { requirements: data, loading }
 }
 
-export function usePools(entityId?: string) {
-  const [pools, setPools] = useState<Pool[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    let cancelled = false
-    const load = async () => {
-      const result = await api.listPools(entityId)
-      if (!cancelled) {
-        setPools(result)
-        setLoading(false)
-      }
-    }
-    load()
-    const unsub = store.subscribe(() => {
-      api.listPools(entityId).then((r) => {
-        if (!cancelled) setPools(r)
-      })
-    })
-    return () => {
-      cancelled = true
-      unsub()
-    }
-  }, [entityId])
-
-  return { pools, loading }
+export function useCapabilityViews(companyId?: string) {
+  const { data, loading } = useStoreData<CapabilityView[]>(
+    () => (companyId ? api.listCapabilityViews(companyId) : Promise.resolve([])),
+    [companyId],
+    []
+  )
+  return { capabilities: data, loading }
 }
 
-export function useEntities() {
-  const [entities, setEntities] = useState<LegalEntity[]>([])
-  const [loading, setLoading] = useState(true)
+export function useAgents(companyId?: string) {
+  const { data, loading } = useStoreData<Agent[]>(() => api.listAgents(companyId), [companyId], [])
+  return { agents: data, loading }
+}
 
-  useEffect(() => {
-    let cancelled = false
-    const load = async () => {
-      const result = await api.listEntities()
-      if (!cancelled) {
-        setEntities(result)
-        setLoading(false)
-      }
-    }
-    load()
-    const unsub = store.subscribe(() => {
-      api.listEntities().then((r) => {
-        if (!cancelled) setEntities(r)
-      })
-    })
-    return () => {
-      cancelled = true
-      unsub()
-    }
-  }, [])
+export function useNumbers(agentId?: string) {
+  const { data, loading } = useStoreData<PhoneNumber[]>(
+    () => api.listNumbers(agentId),
+    [agentId],
+    []
+  )
+  return { numbers: data, loading }
+}
 
-  return { entities, loading }
+export function useProvisions(agentId?: string) {
+  const { data, loading } = useStoreData<Provision[]>(
+    () => api.listProvisions(agentId),
+    [agentId],
+    []
+  )
+  return { provisions: data, loading }
+}
+
+export function useConnections(companyId?: string) {
+  const { data, loading } = useStoreData<ProviderConnection[]>(
+    () => api.listConnections(companyId),
+    [companyId],
+    []
+  )
+  return { connections: data, loading }
+}
+
+export function useImportableNumbers(companyId?: string) {
+  const { data, loading } = useStoreData<ImportableNumber[]>(
+    () => (companyId ? api.listImportableNumbers(companyId) : Promise.resolve([])),
+    [companyId],
+    []
+  )
+  return { importable: data, loading }
 }

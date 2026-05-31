@@ -4,8 +4,8 @@ import { DevToolbar } from './DevToolbar'
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
-  { to: '/numbers', label: 'Numbers' },
-  { to: '/business-registration', label: 'Business registration' },
+  { to: '/capabilities', label: 'Capabilities' },
+  { to: '/numbers', label: 'Agents' },
 ]
 
 export function Layout() {
@@ -20,7 +20,7 @@ export function Layout() {
     <div className="min-h-screen bg-muted/30">
       <header className="border-b bg-background">
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-6">
-          <Link to="/numbers" className="flex items-center gap-2 font-semibold">
+          <Link to="/capabilities" className="flex items-center gap-2 font-semibold">
             <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
               <Phone className="h-4 w-4" />
             </div>
