@@ -227,9 +227,30 @@ code.k{background:#f3f4f6;color:var(--text);padding:1px 6px;border-radius:4px;fo
 .oauth-scope{display:flex;gap:9px;font-size:13px;padding:6px 0;align-items:flex-start;line-height:1.5}
 .oauth-scope .ck{color:var(--accent);font-weight:800;flex-shrink:0;margin-top:1px}
 
+/* Connect-a-source wizard */
+.modal.wide{width:640px}
+.cf-head{padding:16px 24px;border-bottom:1px solid var(--border)}
+.cf-head-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.cf-logos{display:flex;align-items:center;gap:10px}
+.cf-logo{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px}
+.cf-logo.h{background:linear-gradient(135deg,#0f172a,#334155)}
+.cf-arrow{color:var(--text-3);font-size:14px}
+.cf-close{width:26px;height:26px;border:none;background:none;color:var(--text-3);font-size:18px;cursor:pointer;border-radius:6px;line-height:1}
+.cf-close:hover{background:var(--bg);color:var(--text)}
+.cf-title{font-size:16px;font-weight:700;letter-spacing:-.01em;margin:12px 0 12px}
+.cf-steps{display:flex;align-items:center;gap:10px;font-size:12px;font-weight:600;color:var(--text-3)}
+.cf-step{display:flex;align-items:center;gap:7px;white-space:nowrap}
+.cf-step.on{color:var(--text)}
+.cf-step.done{color:var(--accent-text)}
+.cf-num{width:20px;height:20px;border-radius:50%;background:#f3f4f6;color:var(--text-2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800}
+.cf-step.on .cf-num{background:var(--primary);color:#fff}
+.cf-step.done .cf-num{background:var(--accent-bg);color:var(--accent-text)}
+.cf-line{flex:1;height:1px;background:var(--border);min-width:20px}
+.cf-body{padding:22px 24px;max-height:60vh;overflow-y:auto}
+
 /* Source picker dropdown */
-.po-backdrop{position:fixed;inset:0;z-index:70;background:transparent}
-.popover{position:fixed;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.12);width:300px;padding:6px;z-index:80;animation:pop .12s ease;max-height:340px;overflow-y:auto}
+.po-backdrop{position:fixed;inset:0;z-index:110;background:transparent}
+.popover{position:fixed;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.12);width:300px;padding:6px;z-index:120;animation:pop .12s ease;max-height:340px;overflow-y:auto}
 .popover-h{font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;padding:8px 10px 4px}
 .po-search{display:flex;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid var(--border-soft);margin-bottom:4px}
 .po-search input{flex:1;border:none;outline:none;font-size:13px;font-family:inherit;background:transparent}
@@ -350,6 +371,9 @@ const state = {
   popover: null,
   connections: { hubspot: false, salesforce: false },
   authorizing: null,
+  // NEW: inline connect-a-source wizard (connect app + field mapping) shown
+  // over the contacts screen. { crm, step:'connect'|'mapping' }
+  connectFlow: null,
   // NEW: sync mode (default on). Controls whether contacts are pulled or
   // pushed via CRM workflow.
   syncEnabled: { hubspot: true, salesforce: true },
@@ -521,6 +545,16 @@ const SOURCE_META = {
   salesforce: { name:'Salesforce', bg:'var(--salesforce)', letter:'S' },
   pipedrive:  { name:'Pipedrive',  bg:'var(--pipedrive)',  letter:'P' },
 };
+const CRM_OAUTH = {
+  hubspot: {
+    name:'HubSpot', host:'app.hubspot.com', acct:'acme.hubspot.com', bg:'var(--hubspot)', letter:'H',
+    scopes:['View contacts and their properties','Create and update contact properties','Log engagements and timeline events','Install custom workflow actions'],
+  },
+  salesforce: {
+    name:'Salesforce', host:'login.salesforce.com', acct:'acme.my.salesforce.com', bg:'var(--salesforce)', letter:'S',
+    scopes:['View leads, contacts, and accounts','Read & update standard and custom fields','Create Tasks and Platform Events','Install Flow invocable actions'],
+  },
+};
 function sourcePillsFor(selected, onToggleFnName){
   const available = syncedCRMs();
   if(available.length === 0){
@@ -573,6 +607,28 @@ function goHubSpotPre(){ state.view='hubspot-pre'; render(); }
 function goHubSpotConfig(){ state.view='hubspot-config'; render(); }
 function goSalesforcePre(){ state.view='salesforce-pre'; render(); }
 function goSalesforceConfig(){ state.view='salesforce-config'; render(); }
+
+// Inline connect-a-source wizard (over the current screen — no navigation)
+function startConnectSource(crm){
+  closePopover();
+  state.modal = null;
+  state.connectFlow = { crm, step: state.connections[crm] ? 'mapping' : 'connect' };
+  render();
+}
+function connectFlowGrant(){
+  const crm = state.connectFlow.crm;
+  state.connections[crm] = true;
+  state.connectFlow.step = 'mapping';
+  render();
+  toast(`${SOURCE_META[crm].name} connected · syncing contacts`);
+}
+function finishConnectFlow(){
+  const crm = state.connectFlow.crm;
+  state.connectFlow = null;
+  render();
+  toast(`${SOURCE_META[crm].name} field mapping saved`);
+}
+function closeConnectFlow(){ state.connectFlow = null; render(); }
 
 function openOAuth(crm){ state.modal = 'oauth-' + crm; state.authorizing = crm; render(); }
 function cancelOAuth(){ state.modal = null; state.authorizing = null; render(); }
@@ -775,8 +831,7 @@ $('popover-root').addEventListener('click', (e) => {
     if(!menuItem) return;
     const src = menuItem.dataset.source;
     closePopover();
-    if(src === 'hubspot') state.connections.hubspot ? goHubSpotConfig() : goHubSpotPre();
-    else if(src === 'salesforce') state.connections.salesforce ? goSalesforceConfig() : goSalesforcePre();
+    if(src === 'hubspot' || src === 'salesforce') startConnectSource(src);
     return;
   }
   const item = e.target.closest('.po-item');
@@ -819,12 +874,7 @@ function installWorkflow(crm){
 ============================================================ */
 function renderSidebar(){
   if(state.view === 'contacts'){
-    return `
-      <div class="sb-section">Contacts</div>
-      <div class="sb-item on"><span class="ico">●</span>All contacts</div>
-      <div class="sb-item"><span class="ico">○</span>Lists</div>
-      <div class="sb-item"><span class="ico">○</span>Segments</div>
-    `;
+    return '';
   }
   const enrollmentViews = ['enrollments','enrollment-edit'];
   return `
@@ -849,7 +899,7 @@ function renderTopbar(){
   let actions = '';
   if(v === 'contacts'){
     crumb = `<span>Contacts</span>`;
-    actions = `<button class="btn btn-outline btn-sm" onclick="goEnrollments()">Enrollments</button><button class="btn btn-primary btn-sm" onclick="openAddMenu(event)">+ Connect a source ▾</button>`;
+    actions = `<button class="btn btn-outline btn-sm" onclick="goEnrollmentNew()">+ New enrollment</button><button class="btn btn-primary btn-sm" onclick="openAddMenu(event)">+ Connect a source ▾</button>`;
   } else if(v === 'integrations'){
     crumb = `<span class="crumb-light">Settings</span> <span class="crumb-sep">/</span> <span>Integrations</span>`;
   } else if(v === 'fields'){
@@ -1444,15 +1494,73 @@ function viewEnrollmentEdit(){
 /* ============================================================
    MODAL (OAuth)
 ============================================================ */
+function connectFlowModal(){
+  const { crm, step } = state.connectFlow;
+  const meta = CRM_OAUTH[crm];
+  const stepper = `
+    <div class="cf-steps">
+      <div class="cf-step ${step==='connect'?'on':'done'}"><span class="cf-num">${step==='connect'?'1':'✓'}</span>Connect app</div>
+      <div class="cf-line"></div>
+      <div class="cf-step ${step==='mapping'?'on':''}"><span class="cf-num">2</span>Map fields</div>
+    </div>`;
+
+  let body, footer, wide = '';
+  if(step === 'connect'){
+    body = `
+      <div class="oauth-sub" style="margin-bottom:16px">Harmony will sync your ${meta.name} contacts and log call activity back. You can disconnect any time from Settings → Integrations.</div>
+      <div class="oauth-acct">
+        <div>Connecting: <strong>${meta.acct}</strong></div>
+        <div class="muted" style="cursor:pointer">Switch ▾</div>
+      </div>
+      <div class="oauth-scopes-h">Harmony will be able to:</div>
+      ${meta.scopes.map(s => `<div class="oauth-scope"><span class="ck">✓</span><span>${s}</span></div>`).join('')}`;
+    footer = `
+      <button class="btn btn-ghost" onclick="closeConnectFlow()">Cancel</button>
+      <button class="btn" style="background:${meta.bg};color:#fff" onclick="connectFlowGrant()">Connect app</button>`;
+  } else {
+    wide = ' wide';
+    const missing = unmappedRequired(crm).length;
+    const status = missing
+      ? `<span style="color:var(--warn-tx);font-size:12px;font-weight:600">${missing} required field${missing>1?'s':''} still unmapped</span>`
+      : `<span style="color:var(--accent-text);font-size:12px;font-weight:600">✓ All required fields mapped</span>`;
+    body = `
+      <div class="oauth-sub" style="margin-bottom:14px">Match Harmony fields to ${meta.name} properties. Mapped fields become available to your agents and enrollment rules.</div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+        <button class="btn btn-outline btn-sm" onclick="toast('Generating mappings…')">✨ Generate with AI</button>
+      </div>
+      <div class="card" style="margin:0;overflow:hidden">${crmMappingTable(crm)}</div>`;
+    footer = `
+      ${status}
+      <button class="btn btn-primary" onclick="finishConnectFlow()">Done</button>`;
+  }
+
+  return `
+    <div class="modal-bg" onclick="if(event.target===this)closeConnectFlow()">
+      <div class="modal${wide}">
+        <div class="cf-head">
+          <div class="cf-head-top">
+            <div class="cf-logos">
+              <div class="cf-logo h">H</div>
+              <div class="cf-arrow">⟷</div>
+              <div class="cf-logo" style="background:${meta.bg}">${meta.letter}</div>
+            </div>
+            <button class="cf-close" onclick="closeConnectFlow()">×</button>
+          </div>
+          <div class="cf-title">Connect ${meta.name}</div>
+          ${stepper}
+        </div>
+        <div class="cf-body">${body}</div>
+        <div class="modal-ft">${footer}</div>
+      </div>
+    </div>`;
+}
+
 function renderModal(){
   const root = $('modal-root');
+  if(state.connectFlow){ root.innerHTML = connectFlowModal(); return; }
   if(!state.modal){ root.innerHTML = ''; return; }
   const crm = state.modal === 'oauth-hubspot' ? 'hubspot' : 'salesforce';
-  const meta = crm === 'hubspot'
-    ? { name:'HubSpot', host:'app.hubspot.com', acct:'acme.hubspot.com', bg:'var(--hubspot)', letter:'H',
-        scopes: ['View contacts and their properties','Create and update contact properties','Log engagements and timeline events','Install custom workflow actions'] }
-    : { name:'Salesforce', host:'login.salesforce.com', acct:'acme.my.salesforce.com', bg:'var(--salesforce)', letter:'S',
-        scopes: ['View leads, contacts, and accounts','Read & update standard and custom fields','Create Tasks and Platform Events','Install Flow invocable actions'] };
+  const meta = CRM_OAUTH[crm];
   root.innerHTML = `
     <div class="modal-bg" onclick="if(event.target===this)cancelOAuth()">
       <div class="modal">
