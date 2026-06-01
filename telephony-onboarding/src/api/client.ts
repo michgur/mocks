@@ -3,12 +3,14 @@
 
 import type {
   Agent,
+  Alert,
   CapabilityKind,
   CapabilityView,
   Company,
   CompanyMode,
   CountryCode,
   ImportableNumber,
+  Notification,
   PhoneNumber,
   Provision,
   ProvisionSpec,
@@ -26,8 +28,10 @@ import {
 import {
   mockImportableNumbers,
   seedAgents,
+  seedAlerts,
   seedCompanies,
   seedConnections,
+  seedNotifications,
   seedNumbers,
   seedProvisions,
   seedRequirements,
@@ -42,12 +46,16 @@ function delay(ms = LATENCY_MS) {
 }
 
 class MockStore {
-  companies: Company[] = structuredClone(seedCompanies)
-  requirements: Requirement[] = structuredClone(seedRequirements)
-  agents: Agent[] = structuredClone(seedAgents)
-  numbers: PhoneNumber[] = structuredClone(seedNumbers)
-  provisions: Provision[] = structuredClone(seedProvisions)
-  connections: ProviderConnection[] = structuredClone(seedConnections)
+  // Boot into the zero state — the demo starts empty and "Reset to seeded
+  // state" (DevToolbar) loads the populated walkthrough.
+  companies: Company[] = []
+  requirements: Requirement[] = []
+  agents: Agent[] = structuredClone(seedAgents).map((a) => ({ ...a }))
+  numbers: PhoneNumber[] = []
+  provisions: Provision[] = []
+  connections: ProviderConnection[] = []
+  alerts: Alert[] = []
+  notifications: Notification[] = []
   listeners = new Set<Listener>()
 
   subscribe(fn: Listener) {
@@ -66,6 +74,8 @@ class MockStore {
     this.numbers = structuredClone(seedNumbers)
     this.provisions = structuredClone(seedProvisions)
     this.connections = structuredClone(seedConnections)
+    this.alerts = structuredClone(seedAlerts)
+    this.notifications = structuredClone(seedNotifications)
     this.notify()
   }
 
@@ -75,6 +85,8 @@ class MockStore {
     this.numbers = []
     this.provisions = []
     this.connections = []
+    this.alerts = []
+    this.notifications = []
     this.agents = structuredClone(seedAgents).map((a) => ({ ...a })) // agents exist independently
     this.notify()
   }
@@ -194,6 +206,27 @@ export const api = {
     if (!company.countries.includes(country)) company.countries.push(country)
     store.notify()
     return structuredClone(company)
+  },
+
+  /* ── Alerts + notifications (stub) ─────────────────────────────────── */
+
+  async listAlerts(): Promise<Alert[]> {
+    await delay()
+    return structuredClone(store.alerts)
+  },
+
+  async listNotifications(): Promise<Notification[]> {
+    await delay()
+    return structuredClone(store.notifications)
+  },
+
+  // Mark a single notification (or all) as read — clears the bell's unread count.
+  async markNotificationsRead(id?: string): Promise<void> {
+    await delay(50)
+    for (const n of store.notifications) {
+      if (!id || n.id === id) n.read = true
+    }
+    store.notify()
   },
 
   /* ── Requirements ──────────────────────────────────────────────────── */

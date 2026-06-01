@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react'
 import { api, store } from './client'
 import type {
   Agent,
+  Alert,
   CapabilityView,
   Company,
   ImportableNumber,
+  Notification,
   PhoneNumber,
   Provision,
   ProviderConnection,
@@ -40,6 +42,16 @@ function useStoreData<T>(load: () => Promise<T>, deps: unknown[], initial: T) {
 export function useCompanies() {
   const { data, loading } = useStoreData<Company[]>(() => api.listCompanies(), [], [])
   return { companies: data, loading }
+}
+
+export function useAlerts() {
+  const { data, loading } = useStoreData<Alert[]>(() => api.listAlerts(), [], [])
+  return { alerts: data, loading }
+}
+
+export function useNotifications() {
+  const { data, loading } = useStoreData<Notification[]>(() => api.listNotifications(), [], [])
+  return { notifications: data, loading }
 }
 
 export function useRequirements(companyId?: string) {

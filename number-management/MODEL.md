@@ -11,7 +11,8 @@ _Last updated: May 2026._
 - The user thinks in **capabilities** — "I want to call my contacts," "I want to text my contacts." They never think about regulations. Capability is the top-level thing they turn on.
 - Each capability resolves, underneath, to a set of **requirements** — the regulatory artifacts (business identity, A2P, STIR/SHAKEN, country bundles, CNAM) that must be approved for the capability to actually work. Requirements are bookkeeping; the user navigates by capability.
 - One rule governs compliance: a regulated capability needs the **Company to be verified** (its business identity approved). Identity is the foundation everything rests on, not a capability itself.
-- Requirements, identity, and capabilities all live on the **Company** (the legal entity). A Company has **exactly one identity**. If a customer wants separate identities (e.g. a separate legal entity, or a separate country's registration), they create **separate Companies**.
+- A **Company** (the legal entity) **operates in one or more countries**. It has a home country that establishes its core business identity, and can add more operating countries — each contributing its own regulatory mix. Countries can be added retroactively; the user is never forced to spin up a second Company just to reach more contacts.
+- Capabilities are **country-parameterized**. The Capabilities surface shows the union of everything available across the Company's countries, and each capability declares **which countries it's required for** (the flags it carries).
 - Phone **numbers** belong to one **agent**. Capabilities auto-attach; the user does no per-number configuration.
 - Agents have an **auto-rotate** flag. When a number gets spam-labeled (detected by calling it from multiple carriers and screenshotting the result), auto-rotate replaces it with a fresh one in the same geo. The screenshot evidence is viewable in the UI.
 - **BYO Twilio** is an MVP escape hatch for customers who want to use their own account or have needs we don't support. It's deliberately minimal: connect + import + use, with all gating bypassed.
@@ -22,17 +23,27 @@ _Last updated: May 2026._
 
 ```
 Account                         // the Harmony customer / tenant
-  └─ Company                    // the legal entity. MVP: exactly one per account
-       ├─ Identity              // the verified business identity — exactly one
+  └─ Company                    // the legal entity. MVP: one per account
+       ├─ Identity              // the verified business identity (home country)
+       ├─ Countries[]           // the countries the Company operates in (home + added)
        ├─ Capabilities          // channels the user has enabled (+ requirement state)
        └─ Agents
             └─ Numbers
 ```
 
 - **Account** — the tenant. Holds one Company in MVP (multiplicity is modeled but hidden; see [Open / deferred](#open--deferred)).
-- **Company** — the legal entity that regulators recognize. Capabilities and identity are approved *for a Company*, because that's the unit a regulator approves. **One identity per Company.** User-facing, this surface is labelled **"Company Info."**
+- **Company** — the legal entity that regulators recognize. Capabilities and requirements are approved *for a Company*, because that's the unit a regulator approves. A Company has a **home country** (its primary business identity) and a set of **operating countries**; additional countries each carry their own regulatory bundle. User-facing, this surface is labelled **"Company Info."**
 - **Agent** — belongs to one Company; inherits its brand identity and compliance scope.
 - **Number** — belongs to one agent. No multi-agent sharing.
+
+### Multi-country Company
+
+A Company is **not tied to a single country**. It carries:
+
+- a **primary country** — the home registration that establishes the business identity (a US Customer Profile, or a non-US regulatory bundle), and
+- a **set of operating countries** — every country whose contacts the Company reaches.
+
+Countries can be **added retroactively** from Company Info; doing so expands the capability set and introduces that country's requirements. This replaces the old "separate country ⇒ separate Company" rule: multi-country now lives **inside** one Company. (Separate *legal entities* or genuinely separate identities still map to separate Companies — see [Open / deferred](#open--deferred).)
 
 ---
 
@@ -45,29 +56,33 @@ to text my contacts" — never "I want to register an A2P campaign." So **capabi
 top-level organizing principle.** A capability is a channel or feature the user switches on;
 underneath, it fans out into the requirements the system tracks and deduplicates.
 
-The Company's country is fixed by its identity, so the user never picks a country per-capability —
-for a single-country customer (the MVP norm) the Company is effectively invisible.
-
 ### Capability catalog
 
 **Core channels — what the user does:**
 
 | Capability | What the user gets |
 | --- | --- |
-| **Calling** | Place outbound calls to contacts |
-| **Texting** | Send SMS/MMS to contacts |
+| **Outbound Calling** | Place outbound calls to contacts |
+| **Text Messaging** | Send SMS/MMS to contacts |
 
-**Branding add-ons — how the user appears (optional, sit on top of a channel):**
+**Caller-ID & branding add-ons — how the user appears (optional, sit on top of a channel):**
 
 | Capability | What the user gets | Notes |
 | --- | --- | --- |
-| **Branded Caller ID** | Business name/brand shown on outbound calls | CNAM today (US); Branded Calls future |
-| **Alphanumeric Sender ID** | Brand name as the SMS sender instead of a number | EU and other supported countries; not allowed in US |
+| **Caller ID Name** | Business name/brand shown on outbound calls | CNAM today (US); Branded Calls future |
+| **Caller ID Passthrough** | Display the agent's own verified numbers as the caller ID | No carrier registration — rides on identity |
+| **Alphanumeric Sender ID** | Brand name as the SMS sender instead of a number | EU and other supported countries; not allowed in US; future |
 
-The catalog is **country-parameterized, not country-specific**. Each capability is one concept;
-its requirements depend on the Company's country. A UK Company gets Calling, Texting, Alphanumeric
-Sender ID, and (later) Branded Calls — comparable richness to a US Company, just a different
-requirement mix underneath.
+The catalog is **country-parameterized, not country-specific**. Each capability is one concept; its
+requirements depend on country. The Capabilities surface shows the **union across the Company's
+countries**, and each capability declares the countries it's **required for** (e.g. Caller ID Name
+is required for 🇺🇸; provisioning is required for bundle countries like 🇬🇧). A capability that isn't
+required in any of the Company's countries simply doesn't appear.
+
+**Number provisioning** is surfaced in onboarding as an always-on capability row — the right to
+acquire numbers. For non-US bundle countries it's *required for* that country (the bundle is the
+provisioning right); for the US it needs nothing beyond the Company existing, so the row is hidden
+when no bundle country is in play.
 
 (Receiving inbound calls is **not** a capability — it carries no registration. It's a number-level
 behavior, see [`blockIncoming`](#incoming-calls).)
@@ -76,12 +91,12 @@ behavior, see [`blockIncoming`](#incoming-calls).)
 
 Capabilities come in two shapes, and they behave differently for both approval and assignment:
 
-- **Singleton** — identity, Calling, Texting. One per Company. Binary: you can or you can't. No
-  value to vary, so no copies. **Auto-attach** to all eligible numbers; the user makes no
-  per-number choice.
-- **Value-carrying** — Branded Caller ID (CNAM), Alphanumeric Sender ID. The thing that gets
-  registered and approved *is the value* ("Acme Sales" vs "Acme Support" are two separate carrier
-  filings). A Company can hold **multiple approved instances**, each with its own lifecycle.
+- **Singleton** — identity, Outbound Calling, Text Messaging, Caller ID Passthrough. One per Company.
+  Binary: you can or you can't. No value to vary, so no copies. **Auto-attach** to all eligible
+  numbers; the user makes no per-number choice.
+- **Value-carrying** — Caller ID Name (CNAM), Alphanumeric Sender ID. The thing that gets registered
+  and approved *is the value* ("Acme Sales" vs "Acme Support" are two separate carrier filings). A
+  Company can hold **multiple approved instances**, each with its own lifecycle.
 
 **MVP scope for value-carrying capabilities:** model the instance shape (a value is its own
 referenceable, separately-approved record — never an inlined string), but ship **single-value
@@ -90,14 +105,23 @@ right; see [Open / deferred](#open--deferred).
 
 ### How availability is computed
 
-A capability's availability is **derived** from its requirements' statuses:
+A capability's availability is **derived** from its requirements' statuses, rolled up into one of
+four states the user sees:
 
-> *Texting is available when the Company's identity is approved AND its messaging requirement
+| State | Meaning | Label |
+| --- | --- | --- |
+| **not_started** | no requirement created yet (or nothing the capability needs has begun) | "Not set up" |
+| **pending** | a requirement is draft / waiting / in review | "In progress" |
+| **action_needed** | a requirement was rejected or errored | "Action needed" |
+| **available** | identity approved AND every backing requirement approved | "Available" |
+
+> *Text Messaging is available when the Company's identity is approved AND its messaging requirement
 > (e.g. A2P) is approved.*
 
-The user sees a per-capability roll-up — e.g. *"Texting: ✓  ·  Calling: ⏳ (STIR/SHAKEN in
-review)."* This roll-up lives at the Company level (see [usability](#usability-cascade)); it is
-never stored per number.
+The roll-up lives at the Company level (see [usability](#usability-cascade)); it is never stored per
+number. The **Capabilities page is a discovery surface**: it lists *every* capability available
+across the Company's countries — including ones the user hasn't started and "coming soon" ones — so
+the page doubles as a catalog. Live capabilities carry a CTA (Set up / Fix); coming-soon ones don't.
 
 ---
 
@@ -106,9 +130,10 @@ never stored per number.
 ### Identity is the foundation, not a capability
 
 Everything regulated a Company does is approved against its **verified business identity** (Twilio
-Customer Profile for a US Company; a regulatory bundle for a non-US one). Identity describes *who
-you are*. It's shared across every capability, so it can't *be* a capability — it's the foundation
-they all rest on.
+Customer Profile for a US home Company; a regulatory bundle for a non-US one). Identity describes
+*who you are*. It's shared across every capability, so it can't *be* a capability — it's the
+foundation they all rest on. Additional operating countries each add their own regulatory bundle on
+top of the home identity.
 
 In the UI this reads as a setup step ("verify your business / Company Info"), not as one item in
 the list of capabilities you toggle.
@@ -137,26 +162,27 @@ Each requirement is a submittable, reviewable record with a uniform lifecycle:
 - **waiting** — submitted, but the Company isn't verified yet. Auto-advances to *in review* when
   identity clears.
 - **error** — invalid provider state, rare, usually retryable.
-- **not configured** — in the catalog but the customer hasn't started.
+- **not_started** — in the catalog but the customer hasn't started.
 
 Approved requirements can be **edited** (e.g. business address change); editing re-enters review.
 If the identity is later revoked/rejected, every capability on the Company cascades to unusable
 (one deterministic hop — see [usability](#usability-cascade)).
 
-### Requirement catalog (capability → requirements, by Company country)
+### Requirement catalog (capability → requirements, by country)
 
-| Capability | US Company | UK / EU Company |
+| Capability | US country | UK / EU country |
 | --- | --- | --- |
 | **Verified Identity** (foundation) | Twilio Customer Profile | Regulatory bundle (also grants the number-provisioning right) |
-| **Calling** | Identity + STIR/SHAKEN | Identity / bundle |
-| **Texting** | Identity + A2P 10DLC (Brand + Campaign) | Identity / bundle (+ sender ID if alphanumeric) |
-| **Branded Caller ID** | CNAM (now) → Branded Calls (future) | Future |
+| **Outbound Calling** | Identity + STIR/SHAKEN | Identity / bundle |
+| **Text Messaging** | Identity + A2P 10DLC (Brand + Campaign) | Identity / bundle (+ sender ID if alphanumeric) |
+| **Caller ID Name** | CNAM (now) → Branded Calls (future) | Future |
+| **Caller ID Passthrough** | none (rides on identity) | none (rides on identity) |
 | **Alphanumeric Sender ID** | N/A (disallowed) | Identity + sender-ID registration |
 
-**Country scope notes** (the Company's country drives this):
-- **US Company:** STIR/SHAKEN, A2P 10DLC, CNAM, Branded Calls.
-- **Non-US Company (per-country bundle):** UK, AU, DE, FR… The bundle is the Company's identity and
-  also its provisioning right — a **hard prerequisite** for buying any number.
+**Country scope notes** (each of the Company's countries contributes its own mix):
+- **US:** STIR/SHAKEN, A2P 10DLC, CNAM, Branded Calls.
+- **Non-US (per-country bundle):** UK, AU, DE, FR… The bundle is that country's identity/operating
+  right and also its provisioning right — a **hard prerequisite** for buying any number there.
 - The business identity describes the entity; the channel requirements describe what it may do.
 
 Rejections carry a `field` code (e.g. CNAM `30799` → `displayName`) so the edit flow can highlight
@@ -184,7 +210,7 @@ Agent {
 
 PhoneNumber {
   e164
-  country, region            // country = the Company's country
+  country, region            // country = one of the Company's operating countries
   health: number             // 0–100, with screenshot evidence (see auto-rotation)
   status: "active" | "released"
   source: "managed" | "byo"  // managed = Harmony-provisioned; byo = imported
@@ -213,15 +239,28 @@ cancelled). This is where the "Waiting on verification" state lives — there's 
 provisioning skeleton on the agent itself; steady-state capacity is simply the agent's current
 active numbers.
 
+### The agent screen
+
+Numbers are managed inside an **agent detail view**, reached from the top-level **Agents** nav. The
+detail view has tabs (Overview · **Phone numbers** · Prompt · Voice · Actions · Analytics);
+everything below is the Phone numbers tab. The Company switcher lives **within** that tab, since
+it's only relevant to numbers. When the Company isn't verified yet, the tab nests the
+**"Get a phone number"** zero state (verify-your-business CTA) rather than replacing the whole agent
+screen.
+
+**Health is binary in the UI:** a number reads as **Good** or **Spam labeled** (untested counts as
+Good). The underlying 0–100 score still drives rotation; the column just collapses it to two states
+plus the (i) evidence affordance.
+
 ### Acquisition flow (managed)
 
 1. Admin clicks **Add numbers** on the agent screen.
-2. Specifies count + optional region(s) within the Company's country. This creates a **Provision**.
+2. Specifies count + optional region(s) within one of the Company's countries. This creates a **Provision**.
 3. We scan candidates for spam; only buy healthy ones.
 4. Capabilities auto-attach per the Company's stack.
-5. **Company not yet verified** (e.g. a non-US Company whose bundle is still pending)? Not blocked.
-   The Provision sits in `waiting_on_verification` and auto-resolves when the identity clears.
-   Surfaced as "Waiting on verification" on the agent screen.
+5. **Country not yet verified** (e.g. a bundle still pending)? Not blocked. The Provision sits in
+   `waiting_on_verification` and auto-resolves when the identity/bundle clears. Surfaced as
+   "Waiting on verification" on the agent screen.
 
 ### Auto-rotation
 
@@ -258,8 +297,8 @@ Default: incoming calls on an agent's numbers route to that owning agent. The pe
 ### Usability cascade
 
 Usability lives at the **capability level (Company-scoped)** — never on individual numbers. If A2P
-is rejected, *Texting* flips to unavailable for the whole Company, and that applies uniformly to
-every number the Company's agents hold. Surfaced on the agent screen with a deep link to the
+is rejected, *Text Messaging* flips to unavailable for the whole Company, and that applies uniformly
+to every number the Company's agents hold. Surfaced on the agent screen with a deep link to the
 requirement's fix flow.
 
 This is why there is no per-number usability field: a number's usability is derived from the
@@ -314,31 +353,56 @@ To build BYO correctly, deliberately exclude:
 
 ---
 
+## Part 5: Onboarding (capability-first wizard)
+
+The wizard is **capability-first** and leads with geography, not paperwork:
+
+1. **"Where are your contacts located?"** — a **multi-select** of countries. This drives the whole
+   requirement mix; it's the first thing asked.
+2. **Capabilities** — a section (same heading hierarchy) listing the capabilities turned on. Number
+   provisioning and Outbound Calling are **always on** (non-interactive); the rest default on and
+   are toggleable. Each row shows **"Required for: [flags]"** for the countries that need carrier
+   paperwork, and rows that aren't required in any chosen country are hidden.
+3. **Identity** — business information + authorized representative (the foundation).
+4. **Per-capability detail** — e.g. Text Messaging (privacy/ToS URLs), Caller ID Name (display name),
+   shown only when the relevant capability/country is in scope.
+5. **Review & submit** — the entered identity and per-capability details, then "what happens next."
+
+Adding a country later (from Company Info) re-runs the same requirement assembly additively.
+
+---
+
 ## How it all fits together
 
 1. **The user navigates by capability; requirements are bookkeeping.** "I want to text" → the
    system assembles and tracks the underlying requirements and shows a roll-up.
 2. **Identity is the single foundation.** One rule: a regulated capability needs the Company
-   verified. One identity per Company; separate identities = separate Companies.
-3. **Capabilities auto-attach to numbers; the user does zero per-number config.** Singletons attach
+   verified. A Company has one home identity plus per-country bundles for added countries.
+3. **A Company spans multiple countries.** Capabilities union across them; each capability declares
+   the countries it's required for; countries can be added retroactively.
+4. **Capabilities auto-attach to numbers; the user does zero per-number config.** Singletons attach
    automatically; value-carrying capabilities are single-value at MVP.
-4. **Requirement rejection cascades to capability usability** at the Company level, not per number.
-5. **Number provisioning is gated on the Company being verified** for non-US Companies (the bundle
-   is both identity and provisioning right); US numbers are buyable as soon as the Company exists.
-   In-flight intent lives in a Provision, not on the number.
-6. **Rotation is capability-aware** — replacements auto-inherit capabilities.
-7. **BYO is the escape hatch** — gating bypassed, no auto-management, marginal by design.
+5. **Requirement rejection cascades to capability usability** at the Company level, not per number.
+6. **Number provisioning is gated on the country being verified** for non-US bundle countries (the
+   bundle is both identity and provisioning right); US numbers are buyable as soon as the Company
+   exists. In-flight intent lives in a Provision, not on the number.
+7. **Rotation is capability-aware** — replacements auto-inherit capabilities.
+8. **BYO is the escape hatch** — gating bypassed, no auto-management, marginal by design.
 
 ---
 
 ## Open / deferred
 
-- **Per-agent value assignment + A/B testing** for Branded Caller ID / Sender ID — the instance
-  shape is modeled at MVP so these bolt on additively (per-agent default reference, then a managed
+- **Per-agent value assignment + A/B testing** for Caller ID Name / Sender ID — the instance shape
+  is modeled at MVP so these bolt on additively (per-agent default reference, then a managed
   experiment that splits values across an agent's number pool — preserving zero per-number config).
-- **Multiple Companies per account** (holdco/opco, agencies, multi-country/multi-identity) — modeled
-  but hidden at MVP, since multi-identity maps cleanly to multiple Companies. Build the Company
-  switcher / management surface only when a segment actually runs several.
+- **Multiple Companies per account** (holdco/opco, agencies, separate legal entities) — modeled but
+  hidden at MVP. Multi-*country* now lives inside one Company; multiple *identities / legal entities*
+  still map to multiple Companies. Build the Company switcher / management surface only when a
+  segment actually runs several.
+- **Per-country availability derivation** — capability roll-ups currently key off the home country;
+  fully evaluating each capability against each operating country's requirement set is the natural
+  next step as multi-country deepens.
 - **Contact-pool-driven provisioning** ("buy top states by my contact pool") — ties into CRM
   integration work.
 - **Local-presence dialing** (a shared number pool, pick the number matching the callee's area code)

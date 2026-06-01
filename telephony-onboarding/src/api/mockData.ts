@@ -1,7 +1,9 @@
 import type {
   Agent,
+  Alert,
   Company,
   ImportableNumber,
+  Notification,
   PhoneNumber,
   Provision,
   ProviderConnection,
@@ -17,12 +19,24 @@ export const seedCompanies: Company[] = [
     mode: 'managed',
     createdAt: '2026-04-10T14:00:00Z',
   },
+  // A second source: the customer's own Twilio account (BYO). Bypasses our
+  // regulatory layer — its capabilities live in their Twilio console.
+  {
+    id: 'co_byo',
+    name: 'Northwind Trading',
+    country: 'US',
+    countries: ['US'],
+    mode: 'byo',
+    createdAt: '2026-05-02T09:00:00Z',
+  },
 ]
 
 // Agents belong to a Company and own their own numbers.
 export const seedAgents: Agent[] = [
   { id: 'agent_sales', name: 'Sales Agent', companyId: 'co_acme', autoRotate: true, blockIncoming: false },
   { id: 'agent_support', name: 'Support Agent', companyId: 'co_acme', autoRotate: false, blockIncoming: true },
+  // BYO agent — auto-rotate is off by design (we never mutate the customer's account).
+  { id: 'agent_byo', name: 'Northwind Agent', companyId: 'co_byo', autoRotate: false, blockIncoming: false },
 ]
 
 // One requirement per regulatory artifact. Seed exercises a range of states:
@@ -143,6 +157,35 @@ export const seedNumbers: PhoneNumber[] = [
     callsLast30d: 219,
     acquiredAt: '2026-04-20T10:00:00Z',
   },
+  // Numbers imported from the BYO Twilio account (source: 'byo').
+  {
+    id: 'pn_byo_1',
+    agentId: 'agent_byo',
+    number: '+1 (628) 555-0301',
+    country: 'US',
+    region: 'California',
+    city: 'San Francisco, CA',
+    health: 88,
+    status: 'active',
+    source: 'byo',
+    twilioSid: 'PN00000000000000000000000000000b1',
+    callsLast30d: 410,
+    acquiredAt: '2026-05-02T09:10:00Z',
+  },
+  {
+    id: 'pn_byo_2',
+    agentId: 'agent_byo',
+    number: '+1 (646) 555-0302',
+    country: 'US',
+    region: 'New York',
+    city: 'New York, NY',
+    health: 90,
+    status: 'active',
+    source: 'byo',
+    twilioSid: 'PN00000000000000000000000000000b2',
+    callsLast30d: 133,
+    acquiredAt: '2026-05-03T09:10:00Z',
+  },
 ]
 
 // An in-flight acquisition that's blocked on Company verification — surfaced as
@@ -158,7 +201,130 @@ export const seedProvisions: Provision[] = [
   },
 ]
 
-export const seedConnections: ProviderConnection[] = []
+// Stub alerts — a mix of BYO runtime failures and managed lifecycle events, to
+// show the alert surface is platform-wide (not a BYO patch). Static for now.
+export const seedAlerts: Alert[] = [
+  {
+    id: 'al_byo_a2p',
+    severity: 'error',
+    status: 'active',
+    title: 'Text Messaging failing — A2P not registered',
+    detail: '4,210 messages blocked in the last 24h',
+    sourceName: 'Northwind Trading',
+    sourceMode: 'byo',
+    capability: 'Text Messaging',
+    code: '30034',
+    cta: {
+      label: 'Open A2P 10DLC',
+      kind: 'twilio',
+      href: 'https://console.twilio.com/us1/develop/sms/regulatory-compliance/a2p-10dlc',
+    },
+    timeAgo: '12 min ago',
+  },
+  {
+    id: 'al_byo_callerid',
+    severity: 'error',
+    status: 'active',
+    title: 'Outbound calls rejected — caller ID not verified',
+    detail: '318 calls failed in the last 24h',
+    sourceName: 'Northwind Trading',
+    sourceMode: 'byo',
+    capability: 'Outbound Calling',
+    code: '21210',
+    cta: {
+      label: 'Open Voice',
+      kind: 'twilio',
+      href: 'https://console.twilio.com/us1/develop/voice/manage',
+    },
+    timeAgo: '1 hr ago',
+  },
+  {
+    id: 'al_spam',
+    severity: 'warning',
+    status: 'active',
+    title: 'Number spam-labeled',
+    detail: '+1 (415) 555-0188 flagged by T-Mobile · health 38%',
+    sourceName: 'Acme Inc.',
+    sourceMode: 'managed',
+    capability: 'Outbound Calling',
+    cta: { label: 'Replace now', kind: 'replace' },
+    timeAgo: '3 hr ago',
+  },
+  {
+    id: 'al_cnam',
+    severity: 'warning',
+    status: 'active',
+    title: 'Caller ID Name rejected — CNAM',
+    detail: "Display name doesn't match your registered business name",
+    sourceName: 'Acme Inc.',
+    sourceMode: 'managed',
+    capability: 'Caller ID Name',
+    code: '30799',
+    cta: { label: 'Fix', kind: 'fix' },
+    timeAgo: '1 day ago',
+  },
+  {
+    id: 'al_resolved',
+    severity: 'info',
+    status: 'resolved',
+    title: 'Messaging throughput restored',
+    detail: 'Carrier filtering cleared — sending back to normal',
+    sourceName: 'Northwind Trading',
+    sourceMode: 'byo',
+    capability: 'Text Messaging',
+    timeAgo: '2 days ago',
+    cta: { label: '', kind: 'twilio' },
+  },
+]
+
+// Stub notifications — discrete lifecycle events, newest first. A capability
+// approval (good news), a rejection (also surfaces as an alert), and a number
+// rotation. Read/unread drives the bell's unread count.
+export const seedNotifications: Notification[] = [
+  {
+    id: 'nt_stir_approved',
+    kind: 'approved',
+    title: 'Outbound Calling approved',
+    detail: 'STIR/SHAKEN registration cleared review — calling is live.',
+    sourceName: 'Acme Inc.',
+    sourceMode: 'managed',
+    read: false,
+    cta: { label: 'See', to: '/capabilities' },
+    timeAgo: '20 min ago',
+  },
+  {
+    id: 'nt_cnam_rejected',
+    kind: 'rejected',
+    title: 'Caller ID Name rejected',
+    detail: "Display name doesn't match your registered business name.",
+    sourceName: 'Acme Inc.',
+    sourceMode: 'managed',
+    read: false,
+    cta: { label: 'Fix', to: '/capabilities' },
+    timeAgo: '1 day ago',
+  },
+  {
+    id: 'nt_rotated',
+    kind: 'rotated',
+    title: 'Number rotated',
+    detail: '+1 (415) 555-0188 was spam-labeled and replaced with +1 (415) 555-0207.',
+    sourceName: 'Acme Inc.',
+    sourceMode: 'managed',
+    read: true,
+    cta: { label: 'View', to: '/numbers' },
+    timeAgo: '2 days ago',
+  },
+]
+
+export const seedConnections: ProviderConnection[] = [
+  {
+    id: 'conn_byo',
+    companyId: 'co_byo',
+    provider: 'twilio',
+    accountSid: 'AC00000000000000000000000000000by',
+    connectedAt: '2026-05-02T09:05:00Z',
+  },
+]
 
 // The pool of numbers we pretend to find in a freshly connected Twilio account.
 // The import modal lists these (minus any already linked) for the user to pick.

@@ -1,6 +1,8 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { CapabilitiesPage } from './pages/CapabilitiesPage'
+import { SourcesPage } from './pages/SourcesPage'
+import { AlertsPage } from './pages/AlertsPage'
 import { NumbersPage } from './pages/NumbersPage'
 import { WizardPage } from './pages/wizard/WizardPage'
 import { CompanyProvider } from './state/CompanyContext'
@@ -13,6 +15,8 @@ export default function App() {
           <Route element={<Layout />}>
             <Route path="/" element={<Navigate to="/capabilities" replace />} />
             <Route path="/capabilities" element={<CapabilitiesPage />} />
+            <Route path="/sources" element={<SourcesPage />} />
+            <Route path="/alerts" element={<AlertsPage />} />
             <Route path="/numbers" element={<NumbersPage />} />
           </Route>
           <Route path="/wizard" element={<WizardPage />} />

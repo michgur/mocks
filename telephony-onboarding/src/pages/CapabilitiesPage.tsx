@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Check, Clock, AlertTriangle, CircleDashed, Plus } from 'lucide-react'
+import { Check, Clock, AlertTriangle, CircleDashed, Plus, ArrowLeft, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { CompanySwitcher } from '@/components/CompanySwitcher'
@@ -11,6 +11,7 @@ import { useCompanyContext } from '@/state/CompanyContext'
 import { StatusIcon } from '@/components/StatusIcon'
 import { cn } from '@/lib/utils'
 import {
+  availableCapabilities,
   CAPABILITY_DESCRIPTIONS,
   CAPABILITY_LABELS,
   COUNTRY_FLAGS,
@@ -19,6 +20,7 @@ import {
   identityRequirementType,
   isCapabilityFuture,
   type CapabilityAvailability,
+  type CapabilityKind,
   type CapabilityView,
   type Company,
   type Requirement,
@@ -42,16 +44,14 @@ export function CapabilitiesPage() {
   // BYO companies skip our regulatory layer entirely — registrations live in
   // the customer's own Twilio console.
   if (currentCompany.mode === 'byo') {
-    return <ByoCapabilities />
+    return <ByoCapabilities company={currentCompany} />
   }
 
   const reqOf = (type: RequirementType) => requirements.find((r) => r.type === type)
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Capabilities</h1>
-      </div>
+      <TelephonyHeader />
 
       <CompanyInfoCard company={currentCompany} requirements={requirements} />
 
@@ -69,30 +69,138 @@ export function CapabilitiesPage() {
   )
 }
 
+/* ── Shared top row: page title + Source picker ──────────────────────── */
+
+function TelephonyHeader() {
+  return (
+    <div className="mb-6 flex items-center justify-between gap-4">
+      <h1 className="flex items-center gap-1.5 text-2xl font-semibold tracking-tight">
+        <span className="text-muted-foreground">Settings</span>
+        <span className="text-muted-foreground/50">/</span>
+        <span>Telephony</span>
+      </h1>
+      <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-muted-foreground hover:text-foreground"
+          asChild
+        >
+          <Link to="/sources">
+            <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
+            See all sources
+          </Link>
+        </Button>
+        <CompanySwitcher />
+      </div>
+    </div>
+  )
+}
+
 /* ── BYO Twilio: regulatory layer lives in the customer's account ────── */
 
-function ByoCapabilities() {
+// For a BYO source the regulatory work lives in the customer's own Twilio
+// account, so each capability links straight into the relevant Console section
+// instead of carrying a verify/Set up flow.
+const BYO_TWILIO_LINKS: Record<CapabilityKind, { label: string; url: string }> = {
+  calling: { label: 'Voice', url: 'https://console.twilio.com/us1/develop/voice/manage' },
+  texting: {
+    label: 'A2P 10DLC',
+    url: 'https://console.twilio.com/us1/develop/sms/regulatory-compliance/a2p-10dlc',
+  },
+  branded_caller_id: {
+    label: 'Trust Hub',
+    url: 'https://console.twilio.com/us1/develop/trust-hub/overview',
+  },
+  caller_id_passthrough: {
+    label: 'Phone Numbers',
+    url: 'https://console.twilio.com/us1/develop/phone-numbers/manage/incoming',
+  },
+  alphanumeric_sender_id: {
+    label: 'Messaging Senders',
+    url: 'https://console.twilio.com/us1/develop/sms/senders/alpha-sender',
+  },
+}
+
+// We can read the connected Twilio account to detect what's already set up.
+// (Mocked here — in reality this is a read against their account.)
+const BYO_DETECTED: Partial<Record<CapabilityKind, boolean>> = {
+  calling: true,
+  texting: true,
+  caller_id_passthrough: true,
+  branded_caller_id: false,
+}
+
+function ByoCapabilities({ company }: { company: Company }) {
+  const caps = availableCapabilities(company.country)
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Capabilities</h1>
-      </div>
+      <TelephonyHeader />
 
       <Card>
         <div className="border-b px-5 py-4 text-sm font-medium">Company info</div>
         <div className="px-5 py-4">
-          <CompanySwitcher />
+          <div className="text-sm font-medium">{company.name}</div>
           <div className="mt-1.5 text-xs text-muted-foreground">BYO Twilio</div>
         </div>
       </Card>
 
-      <Card className="mt-6">
-        <div className="px-5 py-4 text-sm text-muted-foreground">
-          Capabilities are managed in your Twilio account. Calling, messaging, and caller ID
-          registrations are configured in your Twilio Console — there's nothing to verify here.
-        </div>
-      </Card>
+      <div className="mt-6 rounded-md border bg-muted/40 px-4 py-3 text-xs text-muted-foreground">
+        Capabilities for a BYO source live in your own Twilio account — there's nothing to verify
+        here. We detect what's already configured and link you straight to it in the Twilio Console.
+      </div>
+
+      <div className="mt-3 space-y-3">
+        {caps.map((kind) => (
+          <ByoCapabilityCard key={kind} kind={kind} />
+        ))}
+      </div>
     </div>
+  )
+}
+
+function ByoCapabilityCard({ kind }: { kind: CapabilityKind }) {
+  const link = BYO_TWILIO_LINKS[kind]
+  const detected = BYO_DETECTED[kind]
+  return (
+    <Card className="overflow-hidden">
+      <div className="flex items-start gap-4 px-5 py-4">
+        <div className="min-w-0 flex-1">
+          <div className="font-medium">{CAPABILITY_LABELS[kind]}</div>
+          <div className="mt-1 text-sm text-muted-foreground">{CAPABILITY_DESCRIPTIONS[kind]}</div>
+        </div>
+        <div className="flex flex-col items-end gap-2">
+          <ByoDetectedBadge detected={detected} />
+          <a
+            href={link.url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent"
+          >
+            <img src="/twilio.svg" alt="" className="h-3.5 w-3.5" />
+            Open {link.label}
+            <ExternalLink className="h-3 w-3 text-muted-foreground" />
+          </a>
+        </div>
+      </div>
+    </Card>
+  )
+}
+
+function ByoDetectedBadge({ detected }: { detected?: boolean }) {
+  if (detected) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-success/30 bg-success/10 px-2 py-0.5 text-xs font-medium text-success">
+        <Check className="h-3 w-3" />
+        Configured
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+      <CircleDashed className="h-3 w-3" />
+      Not detected
+    </span>
   )
 }
 
@@ -111,7 +219,7 @@ function CompanyInfoCard({ company, requirements }: { company: Company; requirem
       <div className="px-5 py-4">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
-            <CompanySwitcher />
+            <div className="text-sm font-medium">{company.name}</div>
             {company.mode === 'byo' && (
               <div className="mt-1.5 text-xs text-muted-foreground">BYO Twilio</div>
             )}

@@ -154,6 +154,51 @@ export interface ImportableNumber {
   region?: string
 }
 
+/* ── Alerts (runtime delivery failures + lifecycle events) ───────────── */
+
+// Stubbed for the prototype. Real design deferred — a platform-wide log/alert
+// system. The point this conveys: managed telephony fails at config time
+// (caught by the requirement gate), but BYO/SIP bypass that gate, so failures
+// surface at *runtime* on the outbound send path. Alerts aggregate by
+// (source × capability × error class) and resolve source-aware.
+export type AlertSeverity = 'error' | 'warning' | 'info'
+export type AlertStatus = 'active' | 'resolved'
+
+export interface Alert {
+  id: string
+  severity: AlertSeverity
+  status: AlertStatus
+  title: string
+  detail: string // the aggregated description: count + window, or the reason
+  sourceName: string
+  sourceMode: CompanyMode // drives the source chip (managed vs BYO Twilio)
+  capability?: string
+  code?: string // e.g. Twilio error 30034
+  cta: { label: string; kind: 'twilio' | 'fix' | 'replace'; href?: string }
+  timeAgo: string
+}
+
+/* ── Notifications (point-in-time lifecycle events) ──────────────────── */
+
+// Distinct from Alerts (open problems that aggregate + resolve). Notifications
+// are discrete events on the requirement/number lifecycle — approvals,
+// rejections, rotations — each read/unread and chronological. Good news lives
+// here too (an approval is a notification; it also clears the matching alert).
+export type NotificationKind = 'approved' | 'rejected' | 'rotated' | 'info'
+
+export interface Notification {
+  id: string
+  kind: NotificationKind
+  title: string
+  detail: string
+  sourceName: string
+  sourceMode: CompanyMode
+  read: boolean
+  // Optional in-app CTA (verb matched to kind: See / Fix / View).
+  cta?: { label: string; to: string }
+  timeAgo: string
+}
+
 /* ── Agents + numbers ────────────────────────────────────────────────── */
 
 // Agents are the AI agents that make/receive calls. Each belongs to a Company

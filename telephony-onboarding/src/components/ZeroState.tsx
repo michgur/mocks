@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Phone } from 'lucide-react'
+import { Phone, Waypoints } from 'lucide-react'
 import { Button } from './ui/button'
 import { ConnectTwilioModal } from './ConnectTwilioModal'
 
@@ -30,17 +30,23 @@ export function ZeroState({ onGetStarted }: { onGetStarted?: () => void } = {}) 
           Takes 5 minutes • Approval usually in 1–7 days
         </div>
       </div>
-      <div className="mt-12 flex items-center justify-center gap-6 text-sm">
-        <button
+      <div className="mt-12 space-y-3">
+        <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Or bring your own
+        </div>
+        <Button
+          variant="outline"
+          size="lg"
+          className="w-full justify-center gap-2.5"
           onClick={() => setConnectOpen(true)}
-          className="text-muted-foreground hover:text-foreground transition-colors"
         >
+          <img src="/twilio.svg" alt="" className="h-5 w-5" />
           Use your Twilio account
-        </button>
-        <span className="text-muted-foreground">·</span>
-        <button className="text-muted-foreground hover:text-foreground transition-colors">
-          Set up SIP
-        </button>
+        </Button>
+        <Button variant="outline" size="lg" className="w-full justify-center gap-2.5">
+          <Waypoints className="h-5 w-5" />
+          Set up SIP trunking
+        </Button>
       </div>
 
       <ConnectTwilioModal open={connectOpen} onOpenChange={setConnectOpen} />
