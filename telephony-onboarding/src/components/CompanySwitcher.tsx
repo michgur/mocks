@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Building2, Check, ChevronDown, Plus, Waypoints } from 'lucide-react'
 import { useCompanyContext } from '@/state/CompanyContext'
 import { ConnectTwilioModal } from './ConnectTwilioModal'
+import { TwilioIcon } from './TwilioIcon'
 import { cn } from '@/lib/utils'
 
 export function CompanySwitcher() {
@@ -55,7 +56,7 @@ export function CompanySwitcher() {
         )}
       >
         {currentCompany?.mode === 'byo' ? (
-          <img src="/twilio.svg" alt="" className="h-3.5 w-3.5" />
+          <TwilioIcon className="h-3.5 w-3.5" />
         ) : (
           <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
         )}
@@ -89,7 +90,7 @@ export function CompanySwitcher() {
                 onClick={connectTwilio}
                 className="flex w-full items-center gap-2.5 rounded-sm px-2 py-1.5 text-sm text-left hover:bg-accent"
               >
-                <img src="/twilio.svg" alt="" className="h-4 w-4" />
+                <TwilioIcon className="h-4 w-4" />
                 BYO Twilio
               </button>
               <button
@@ -119,7 +120,7 @@ export function CompanySwitcher() {
                   >
                     <div className="flex h-6 w-6 items-center justify-center rounded bg-muted">
                       {c.mode === 'byo' ? (
-                        <img src="/twilio.svg" alt="" className="h-3.5 w-3.5" />
+                        <TwilioIcon className="h-3.5 w-3.5" />
                       ) : (
                         <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
                       )}

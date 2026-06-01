@@ -11,6 +11,7 @@ import {
 import { Building2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { TwilioIcon } from '@/components/TwilioIcon'
 import { api } from '@/api/client'
 import { useAlerts, useNotifications } from '@/api/useApi'
 import { cn } from '@/lib/utils'
@@ -210,7 +211,7 @@ function AlertCta({ cta }: { cta: Alert['cta'] }) {
         rel="noreferrer"
         className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent"
       >
-        <img src="/twilio.svg" alt="" className="h-3.5 w-3.5" />
+        <TwilioIcon className="h-3.5 w-3.5" />
         {cta.label}
         <ExternalLink className="h-3 w-3 text-muted-foreground" />
       </a>
@@ -229,7 +230,7 @@ function SourceChip({ name, byo }: { name: string; byo: boolean }) {
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full border bg-muted/50 px-2 py-0.5 text-xs">
       {byo ? (
-        <img src="/twilio.svg" alt="" className="h-3 w-3" />
+        <TwilioIcon className="h-3 w-3" />
       ) : (
         <Building2 className="h-3 w-3 text-muted-foreground" />
       )}

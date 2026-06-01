@@ -1,40 +1,60 @@
 # Harmony telephony model
 
 Design state of Harmony's telephony stack — the regulatory layer (compliance), the
-operational layer (phone numbers), and the escape hatch (bring-your-own provider) —
-as a handoff for fresh context.
+connectivity layer (where calls and texts originate), the operational layer (phone
+numbers), and the alerting layer — as a handoff for fresh context.
 
-_Last updated: May 2026._
+_Last updated: June 2026._
 
 ## TL;DR
 
 - The user thinks in **capabilities** — "I want to call my contacts," "I want to text my contacts." They never think about regulations. Capability is the top-level thing they turn on.
 - Each capability resolves, underneath, to a set of **requirements** — the regulatory artifacts (business identity, A2P, STIR/SHAKEN, country bundles, CNAM) that must be approved for the capability to actually work. Requirements are bookkeeping; the user navigates by capability.
-- One rule governs compliance: a regulated capability needs the **Company to be verified** (its business identity approved). Identity is the foundation everything rests on, not a capability itself.
-- A **Company** (the legal entity) **operates in one or more countries**. It has a home country that establishes its core business identity, and can add more operating countries — each contributing its own regulatory mix. Countries can be added retroactively; the user is never forced to spin up a second Company just to reach more contacts.
-- Capabilities are **country-parameterized**. The Capabilities surface shows the union of everything available across the Company's countries, and each capability declares **which countries it's required for** (the flags it carries).
-- Phone **numbers** belong to one **agent**. Capabilities auto-attach; the user does no per-number configuration.
-- Agents have an **auto-rotate** flag. When a number gets spam-labeled (detected by calling it from multiple carriers and screenshotting the result), auto-rotate replaces it with a fresh one in the same geo. The screenshot evidence is viewable in the UI.
-- **BYO Twilio** is an MVP escape hatch for customers who want to use their own account or have needs we don't support. It's deliberately minimal: connect + import + use, with all gating bypassed.
+- Two **orthogonal axes** structure the stack:
+  - **Legal entity** — the **Company**: who you are. Verified identity and compliance scope.
+  - **Connectivity** — the **Source**: where numbers and traffic come from. Three modes — **managed**, **BYO Twilio**, **SIP trunk**.
+- The user picks among connectivity options in one unified **Source** switcher. A source is either a managed Company or an external provider connection (BYO Twilio / SIP trunk).
+- **Managed** is the opinionated path: Harmony provisions numbers and runs the full regulatory pipeline. **BYO Twilio** and **SIP trunk** are escape hatches — the customer brings their own connectivity and gating is bypassed.
+- One rule governs managed compliance: a regulated capability needs the **Company verified** (its business identity approved). Identity is the foundation everything rests on, not a capability.
+- A **Company operates in one or more countries**, each contributing its own regulatory mix. Capabilities are **country-parameterized**.
+- Phone **numbers** belong to one **agent** and live in **pools** keyed by source. An agent can hold numbers from **multiple pools / sources** at once.
+- **Capabilities are source-aware**: they describe both what the user turns on *and* what a source can support. A SIP trunk is voice-only, so Text Messaging and Number Provisioning are permanently unavailable on it.
+- Agents have **auto-rotate** (managed numbers only): a spam-labeled number is replaced with a fresh one in the same geo. Screenshot evidence is viewable in the UI.
+- Runtime delivery failures and lifecycle events surface in one **notifications inbox** (bell in the header): **alerts** (open problems that aggregate and resolve) plus **notifications** (point-in-time events like approvals, rejections, rotations).
 
 ---
 
 ## Core model
 
 ```
-Account                         // the Harmony customer / tenant
-  └─ Company                    // the legal entity. MVP: one per account
-       ├─ Identity              // the verified business identity (home country)
-       ├─ Countries[]           // the countries the Company operates in (home + added)
-       ├─ Capabilities          // channels the user has enabled (+ requirement state)
-       └─ Agents
-            └─ Numbers
+Account                                 // the Harmony customer / tenant
+  └─ Company(ies)                        // legal entity: identity + compliance scope
+       ├─ Identity                       // verified business identity (home country)
+       ├─ Countries[]                    // operating countries (home + added)
+       ├─ Capabilities                   // channels enabled (+ requirement state)
+       └─ Sources (connectivity)         // one or more, switched in one picker:
+            ├─ Managed                   // Harmony-provisioned numbers, full pipeline
+            ├─ BYO Twilio                // ProviderConnection: imported numbers
+            └─ SIP trunk                 // ProviderConnection: declared numbers, voice-only
+
+Agent                                    // belongs to one Company
+  └─ Numbers                             // pooled by source; an agent may span pools
 ```
 
-- **Account** — the tenant. Holds one Company in MVP (multiplicity is modeled but hidden; see [Open / deferred](#open--deferred)).
-- **Company** — the legal entity that regulators recognize. Capabilities and requirements are approved *for a Company*, because that's the unit a regulator approves. A Company has a **home country** (its primary business identity) and a set of **operating countries**; additional countries each carry their own regulatory bundle. User-facing, this surface is labelled **"Company Info."**
+- **Account** — the tenant. Holds one or more Companies (multiplicity modeled; the management surface ships only for accounts that run several — see [Open / deferred](#open--deferred)).
+- **Company** — the legal entity that regulators recognize. Capabilities and requirements are approved *for a Company*, because that's the unit a regulator approves. It has a **home country** (primary business identity) and a set of **operating countries**. User-facing, this surface is labelled **"Company Info."** New legal entities are registered in account-level **Settings**, not from the source switcher.
+- **Source** — a connectivity entry the user switches between. Resolves to one of three modes. A **managed** source is backed by a verified Company; **BYO Twilio** and **SIP trunk** sources are backed by a `ProviderConnection`. All three appear together in the single Source switcher.
 - **Agent** — belongs to one Company; inherits its brand identity and compliance scope.
-- **Number** — belongs to one agent. No multi-agent sharing.
+- **Number** — belongs to one agent, and to the pool of the source it came from. An agent can own numbers across several pools.
+
+### The two axes (identity vs connectivity)
+
+These are independent concerns deliberately surfaced through one picker:
+
+- **Identity / legal entity (Company)** answers *who is placing this call* — the verified business, its compliance scope, the countries it operates in.
+- **Connectivity (Source)** answers *what pipe the call travels over* — Harmony-managed, the customer's Twilio account, or the customer's SIP trunk.
+
+The user never reasons about this split explicitly: they open the Source switcher and choose where their numbers come from. Registering a *new legal entity* and connecting a *new provider* are different actions, but both produce a new entry in the same switcher.
 
 ### Multi-country Company
 
@@ -43,7 +63,13 @@ A Company is **not tied to a single country**. It carries:
 - a **primary country** — the home registration that establishes the business identity (a US Customer Profile, or a non-US regulatory bundle), and
 - a **set of operating countries** — every country whose contacts the Company reaches.
 
-Countries can be **added retroactively** from Company Info; doing so expands the capability set and introduces that country's requirements. This replaces the old "separate country ⇒ separate Company" rule: multi-country now lives **inside** one Company. (Separate *legal entities* or genuinely separate identities still map to separate Companies — see [Open / deferred](#open--deferred).)
+Countries can be **added retroactively** from Company Info; doing so expands the capability set and introduces that country's requirements. Multi-country lives **inside** one Company. Separate *legal entities* still map to separate Companies.
+
+### Navigation
+
+- **Settings › Telephony** — the connectivity + regulatory setup surface: the Source switcher, Company Info (identity), and the capability list. Breadcrumbed as `Settings / Telephony`.
+- **Agents** — top-level nav → agent detail → **Phone numbers** tab, where number pools are managed.
+- **Notifications** — a bell in the header opens the unified alerts + notifications inbox; the bell badges the count of open alerts plus unread notifications.
 
 ---
 
@@ -87,26 +113,42 @@ when no bundle country is in play.
 (Receiving inbound calls is **not** a capability — it carries no registration. It's a number-level
 behavior, see [`blockIncoming`](#incoming-calls).)
 
+### Capabilities are also source-aware
+
+The capability model does double duty: besides describing what the user enables, it describes
+**what a given source can support**. A source's mode constrains its capability set:
+
+| Capability | Managed | BYO Twilio | SIP trunk |
+| --- | --- | --- | --- |
+| **Outbound Calling** | ✓ (regulatory pipeline) | ✓ (their account) | ✓ (termination) |
+| **Text Messaging** | ✓ (A2P) | ✓ (their A2P) | ✗ voice-only |
+| **Caller ID Name** | ✓ (CNAM) | their Trust Hub | their carrier |
+| **Caller ID Passthrough** | ✓ | ✓ | ✓ |
+| **Number Provisioning** | ✓ | import only | ✗ numbers declared |
+
+For **managed** sources, capability state is *derived from Harmony-tracked requirements* (the
+gating below). For **BYO / SIP** sources, capability state is **detected or declared**, not
+verified by Harmony: the capability card shows whether the relevant thing is configured in the
+customer's account and links out to the provider console rather than carrying a Set up / Verify
+flow. Capabilities a mode cannot support (e.g. Text Messaging on a SIP trunk) are permanently off.
+
 ### Two capability shapes
 
-Capabilities come in two shapes, and they behave differently for both approval and assignment:
-
 - **Singleton** — identity, Outbound Calling, Text Messaging, Caller ID Passthrough. One per Company.
-  Binary: you can or you can't. No value to vary, so no copies. **Auto-attach** to all eligible
-  numbers; the user makes no per-number choice.
-- **Value-carrying** — Caller ID Name (CNAM), Alphanumeric Sender ID. The thing that gets registered
-  and approved *is the value* ("Acme Sales" vs "Acme Support" are two separate carrier filings). A
-  Company can hold **multiple approved instances**, each with its own lifecycle.
+  Binary: you can or you can't. **Auto-attach** to all eligible numbers; the user makes no per-number choice.
+- **Value-carrying** — Caller ID Name (CNAM), Alphanumeric Sender ID. The thing registered and approved
+  *is the value* ("Acme Sales" vs "Acme Support" are two separate carrier filings). A Company can hold
+  **multiple approved instances**, each with its own lifecycle.
 
 **MVP scope for value-carrying capabilities:** model the instance shape (a value is its own
 referenceable, separately-approved record — never an inlined string), but ship **single-value
-only**. Per-agent value assignment and A/B testing bolt on later additively *because* the shape is
-right; see [Open / deferred](#open--deferred).
+only**. Per-agent value assignment and A/B testing bolt on later additively; see
+[Open / deferred](#open--deferred).
 
-### How availability is computed
+### How availability is computed (managed)
 
-A capability's availability is **derived** from its requirements' statuses, rolled up into one of
-four states the user sees:
+A managed capability's availability is **derived** from its requirements' statuses, rolled up into
+one of four states the user sees:
 
 | State | Meaning | Label |
 | --- | --- | --- |
@@ -115,17 +157,17 @@ four states the user sees:
 | **action_needed** | a requirement was rejected or errored | "Action needed" |
 | **available** | identity approved AND every backing requirement approved | "Available" |
 
-> *Text Messaging is available when the Company's identity is approved AND its messaging requirement
-> (e.g. A2P) is approved.*
-
 The roll-up lives at the Company level (see [usability](#usability-cascade)); it is never stored per
 number. The **Capabilities page is a discovery surface**: it lists *every* capability available
 across the Company's countries — including ones the user hasn't started and "coming soon" ones — so
-the page doubles as a catalog. Live capabilities carry a CTA (Set up / Fix); coming-soon ones don't.
+the page doubles as a catalog.
 
 ---
 
 ## Part 2: Requirements (the regulatory layer underneath)
+
+This layer applies to **managed** sources. BYO Twilio and SIP trunks bypass it entirely (see
+[Part 4](#part-4-connectivity--sources)).
 
 ### Identity is the foundation, not a capability
 
@@ -144,8 +186,7 @@ There is exactly **one** cross-cutting dependency:
 
 > **A regulated capability requires the Company to be verified.**
 
-You can't switch on any capability until the Company's identity is approved — the same way you
-can't use an app before signing up.
+You can't switch on any managed capability until the Company's identity is approved.
 
 ### Requirement lifecycle
 
@@ -159,8 +200,7 @@ Each requirement is a submittable, reviewable record with a uniform lifecycle:
      └────────────────── re-edit ◀── rejected ◀─────────────────┘
 ```
 
-- **waiting** — submitted, but the Company isn't verified yet. Auto-advances to *in review* when
-  identity clears.
+- **waiting** — submitted, but the Company isn't verified yet. Auto-advances to *in review* when identity clears.
 - **error** — invalid provider state, rare, usually retryable.
 - **not_started** — in the catalog but the customer hasn't started.
 
@@ -188,11 +228,6 @@ If the identity is later revoked/rejected, every capability on the Company casca
 Rejections carry a `field` code (e.g. CNAM `30799` → `displayName`) so the edit flow can highlight
 the exact field to fix rather than show a generic error.
 
-### Notifications
-
-Approval and rejection fire notifications (in-app + email to `createdBy`). Each carries: requirement
-type, new status, reason, a CTA verb matched to status (Fix / Review / See), and a short explanation.
-
 ---
 
 ## Part 3: Number management
@@ -203,8 +238,8 @@ type, new status, reason, a CTA verb matched to status (Fix / Review / See), and
 Agent {
   ...                        // existing agent fields
   companyId                  // brand identity / compliance scope
-  numbers: PhoneNumber[]
-  autoRotate: boolean
+  numbers: PhoneNumber[]     // may span several source pools
+  autoRotate: boolean        // managed numbers only
   blockIncoming: boolean     // default false
 }
 
@@ -213,7 +248,7 @@ PhoneNumber {
   country, region            // country = one of the Company's operating countries
   health: number             // 0–100, with screenshot evidence (see auto-rotation)
   status: "active" | "released"
-  source: "managed" | "byo"  // managed = Harmony-provisioned; byo = imported
+  source: "managed" | "byo"  // managed = Harmony-provisioned; byo = imported/declared
   twilioSid
   acquiredAt
 }
@@ -221,7 +256,7 @@ PhoneNumber {
 
 If a `PhoneNumber` exists, it is by definition already provisioned — so its status is just
 `active | released`. In-flight acquisition (requested-but-not-yet-bought, waiting-on-verification,
-retry) is **not** a number state; it lives in a separate **Provision** record.
+retry) is **not** a number state; it lives in a separate **Provision** record (managed only).
 
 ```
 Provision {
@@ -234,17 +269,20 @@ Provision {
 }
 ```
 
-A Provision lives from the moment the admin clicks "Add numbers" until the request is fulfilled (or
-cancelled). This is where the "Waiting on verification" state lives — there's no persistent
-provisioning skeleton on the agent itself; steady-state capacity is simply the agent's current
-active numbers.
+### Pools and multi-source agents
+
+A number belongs to the **pool** of the source it came from — the managed pool, a BYO Twilio pool,
+or a SIP-trunk pool. An **agent can own numbers from multiple pools simultaneously**: e.g. some
+Harmony-managed numbers plus numbers declared over a SIP trunk. The numbers list groups by source.
+Behavior branches on `source`: managed numbers run the full pipeline and auto-rotation; BYO/SIP
+numbers bypass gating and are never auto-mutated.
 
 ### The agent screen
 
 Numbers are managed inside an **agent detail view**, reached from the top-level **Agents** nav. The
 detail view has tabs (Overview · **Phone numbers** · Prompt · Voice · Actions · Analytics);
-everything below is the Phone numbers tab. The Company switcher lives **within** that tab, since
-it's only relevant to numbers. When the Company isn't verified yet, the tab nests the
+everything below is the Phone numbers tab. The Source switcher lives **within** that tab, since
+it's only relevant to numbers. When a managed Company isn't verified yet, the tab nests the
 **"Get a phone number"** zero state (verify-your-business CTA) rather than replacing the whole agent
 screen.
 
@@ -259,35 +297,35 @@ plus the (i) evidence affordance.
 3. We scan candidates for spam; only buy healthy ones.
 4. Capabilities auto-attach per the Company's stack.
 5. **Country not yet verified** (e.g. a bundle still pending)? Not blocked. The Provision sits in
-   `waiting_on_verification` and auto-resolves when the identity/bundle clears. Surfaced as
-   "Waiting on verification" on the agent screen.
+   `waiting_on_verification` and auto-resolves when the identity/bundle clears.
 
-### Auto-rotation
+### Auto-rotation (managed only)
 
 Spam labeling is detected by a proprietary mechanism: we call each number from different carriers
 and screenshot the result. **This evidence is surfaced in the UI** — an **(i) icon in the health
-column** of the numbers list; hovering loads the screenshot so the admin can see *why* a number is
-flagged.
+column**; hovering loads the screenshot so the admin can see *why* a number is flagged.
 
 If `autoRotate = true`:
 1. Acquire a replacement in the **same `{country, region}`** as the dying number.
 2. Run the spam scan, pick a healthy candidate.
 3. Capabilities auto-attach to the new number.
 4. Release the dying number.
-5. Notify admin: *"Replaced +1 (415) 555-0123 with +1 (415) 555-0456 in Sarah's numbers.
-   Reason: health 38% (carrier complaint)."*
+5. Notify admin of the swap and reason.
 
 If `autoRotate = false`: send a health alert with a **Replace now** CTA. Admin can replace, release,
-or ignore.
+or ignore. If no replacement is available right now: release the dying number anyway, retry in the
+background via a Provision, and notify if retries fail past a threshold.
 
-If no replacement is available right now: release the dying number anyway (it's hurting reputation),
-retry in the background via a Provision, and notify if retries fail past a threshold.
+Auto-rotation never applies to BYO/SIP numbers — Harmony does not mutate the customer's account.
 
 ### Manual release (managed)
 
 When the admin releases a managed number, the modal asks:
 - **Release and replace** (default) — top up with an equivalent in the same geo, keep capacity stable.
 - **Release and shrink** — agent has one fewer number.
+
+For BYO/SIP numbers, "release" means **unlink** — Harmony stops using the number; it is never
+released on the customer's account.
 
 ### Incoming calls
 
@@ -296,122 +334,194 @@ Default: incoming calls on an agent's numbers route to that owning agent. The pe
 
 ### Usability cascade
 
-Usability lives at the **capability level (Company-scoped)** — never on individual numbers. If A2P
-is rejected, *Text Messaging* flips to unavailable for the whole Company, and that applies uniformly
-to every number the Company's agents hold. Surfaced on the agent screen with a deep link to the
-requirement's fix flow.
-
-This is why there is no per-number usability field: a number's usability is derived from the
-relevant capability's status for its Company.
+Usability lives at the **capability level (Company-scoped)** for managed sources — never on
+individual numbers. If A2P is rejected, *Text Messaging* flips to unavailable for the whole Company,
+applying uniformly to every managed number its agents hold. Surfaced on the agent screen with a deep
+link to the requirement's fix flow. (BYO/SIP usability is governed by the customer's own account,
+not this cascade — failures surface as runtime alerts instead; see [Part 5](#part-5-alerts--notifications).)
 
 ---
 
-## Part 4: BYO Twilio (escape hatch)
+## Part 4: Connectivity & sources
 
-### What it is
+Connectivity has three modes, all reached through the one **Source** switcher.
 
-An escape hatch — **never the primary path** — for customers who want to use their own Twilio
-account, or who have requirements we don't support (a country, a carrier relationship, a special
-compliance setup) at MVP or ever. It deflects long-tail demand so the managed product can stay
-narrow and opinionated: "not natively, but you can BYO and handle it yourself."
+### Managed (the primary path)
 
-### Scope: connect + import + use
+Harmony provisions numbers and runs the full regulatory pipeline ([Part 2](#part-2-requirements-the-regulatory-layer-underneath)).
+Numbers are bought, spam-scanned, capability-attached, and auto-rotated by Harmony. This is the
+opinionated default; the escape hatches exist so it can stay narrow.
 
-That's the whole feature:
-1. **Connect** the customer's Twilio account (prefer **Twilio Connect** authorization over handling
-   raw API keys — the customer authorizes Harmony and can revoke).
-2. **Import** their existing numbers (selection from the connected account; import only — no buying
-   into their account at MVP).
-3. **Use** them — agents call/text through them. This is the same machinery as managed; only the
-   originating account differs.
+### BYO Twilio (escape hatch)
 
-### Gating is bypassed
+For customers who want to use their own Twilio account, or have needs the managed catalog doesn't
+cover. Scope is **connect + import + use**:
 
-The most important rule: **BYO numbers bypass Harmony's capability/requirement gating entirely**
-(`source = "byo"` short-circuits it). The customers who need BYO are, by definition, often outside
-our managed catalog — a "your Company isn't verified yet" gate would brick the escape hatch for
-exactly the people it exists for. BYO numbers just work; the customer owns the consequences
-(compliance, reputation, billing).
+1. **Connect** the customer's Twilio account (prefer **Twilio Connect** authorization over raw API
+   keys — the customer authorizes Harmony and can revoke).
+2. **Import** existing numbers — selection from the connected account (import only; no buying into
+   their account at MVP). The account's number inventory is **discoverable**, so Harmony lists it.
+3. **Use** them — agents call/text through them, the same machinery as managed; only the originating
+   account differs.
 
-### BYO scope boundaries (build guidance)
+### SIP trunk (escape hatch)
 
-To build BYO correctly, deliberately exclude:
-- **Auto-rotation / auto-replace.** Health scanning may still run (it's external), but Harmony never
-  mutates the customer's account automatically.
-- **Release = unlink**, not release-on-their-account. We stop using the number; we never release a
-  number the customer owns.
-- **Managed compliance.** The onboarding/requirement pipeline is skipped. If something's wrong with
-  a BYO number, the answer is "check your Twilio account."
+For customers who bring their own carrier/PBX, connected via Twilio Elastic SIP Trunking (BYOC). It
+is the next rung of the same connectivity axis as BYO Twilio — connectivity the customer owns, not a
+new product pillar.
+
+- **Bidirectional, outbound-first:** **termination** (Harmony → customer trunk → PSTN, outbound) and
+  **origination** (inbound → trunk → Harmony). A single **SIP wizard** configures both directions.
+- **Numbers are declared, not discovered.** A trunk exposes no number inventory to enumerate, so the
+  customer **declares** which numbers route over it rather than picking from a discovered list.
+- **Voice-only.** No SMS — **Text Messaging** is permanently unavailable, and **Number Provisioning**
+  is off (the customer brings numbers).
+- Carries a **channel / concurrency ceiling** (max simultaneous calls).
+- **STIR/SHAKEN attestation** depends on the customer's carrier; Harmony does not sign on their behalf.
+- Enterprise-oriented at MVP.
+
+*Why bring your own numbers for outbound at all (vs. disposable managed numbers)?* Customers with
+established, branded, or carrier-relationship numbers — and the CNAM/reputation already built on
+them — want to keep using known numbers. They manage burn themselves (rotation, warming, spreading
+volume, reputation monitoring) on their own infrastructure.
+
+### Gating is bypassed (BYO + SIP)
+
+The most important rule for both escape hatches: **BYO/SIP numbers bypass Harmony's
+capability/requirement gating** (`source = "byo"` short-circuits it). The customers who need these
+are, by definition, often outside the managed catalog — a "your Company isn't verified yet" gate
+would brick the escape hatch for exactly the people it exists for. The numbers just work; the
+customer owns the consequences (compliance, reputation, billing).
+
+Because gating is bypassed, these modes **fail at runtime** rather than config time — see
+[Part 5](#part-5-alerts--notifications).
+
+### Scope boundaries (BYO + SIP)
+
+- **No auto-rotation / auto-replace.** Health scanning may still run (it's external), but Harmony
+  never mutates the customer's account/trunk automatically.
+- **Release = unlink**, not release-on-their-account.
+- **No managed compliance.** The requirement pipeline is skipped; capability state is detected
+  (BYO) or declared (SIP) and links out to the provider console.
 
 ### Model impact
 
-- New entity **ProviderConnection** (`provider`, auth, `accountSid`) at the Company level. MVP:
-  one connection, Twilio only. Named provider-agnostically, but not over-invested in speculative
-  multi-provider abstraction — it's deliberately marginal.
+- Entity **ProviderConnection** (`provider`, auth, `accountSid` / trunk config) backs BYO and SIP
+  sources. Named provider-agnostically; not over-invested in speculative multi-provider abstraction.
 - `PhoneNumber.source` (`managed | byo`) is the field behavior branches on.
-- **One mode per Company** in MVP — a Company is either managed or BYO, not a mixed inventory.
+- A Company can carry **multiple sources at once** (a managed pool plus BYO and/or SIP), and agents
+  draw numbers across pools. (Sources are not mutually exclusive per Company.)
 
 ---
 
-## Part 5: Onboarding (capability-first wizard)
+## Part 5: Alerts & notifications
 
-The wizard is **capability-first** and leads with geography, not paperwork:
+Managed telephony fails at **config time** — the requirement gate catches problems before anything
+ships. BYO and SIP **bypass that gate**, so their failures surface at **runtime** on the send path.
+Outbound calls and SMS are the most vulnerable. Both kinds of signal land in one **notifications
+inbox** (the bell in the header), which holds two distinct concepts:
 
-1. **"Where are your contacts located?"** — a **multi-select** of countries. This drives the whole
-   requirement mix; it's the first thing asked.
-2. **Capabilities** — a section (same heading hierarchy) listing the capabilities turned on. Number
-   provisioning and Outbound Calling are **always on** (non-interactive); the rest default on and
-   are toggleable. Each row shows **"Required for: [flags]"** for the countries that need carrier
-   paperwork, and rows that aren't required in any chosen country are hidden.
+### Alerts (open problems)
+
+Aggregated, resolvable problems. Each alert keys off **(source × capability × error class)** and
+carries:
+
+- **severity** — `error | warning | info`
+- **status** — `active | resolved` (alerts resolve where the problem actually lives)
+- **source** — the chip showing which source (managed vs BYO/SIP) and its name
+- **capability** and **error code** where applicable (e.g. Twilio `30034` A2P unregistered,
+  `21210` caller-ID not verified, `21215` geo-permission, `30799` CNAM rejection)
+- a **CTA** matched to the fix path — open the relevant section of the customer's Twilio console
+  (BYO/SIP), fix the requirement in Harmony (managed), or replace a spam-labeled number.
+
+### Notifications (point-in-time events)
+
+Discrete lifecycle events, **read/unread**, chronological. Approvals, rejections, and number
+rotations. Good news lives here too — an approval is a notification. Each carries an event kind, a
+source, a short detail, and a CTA verb matched to the event (See / Fix / View). Notifications are
+delivered in-app and by email to `createdBy`.
+
+### How they relate
+
+A **rejection** fires both a notification *and* an alert. An **approval** fires a notification and
+**clears the matching alert**. The bell badges the count of **open alerts + unread notifications**.
+
+---
+
+## Part 6: Onboarding wizards
+
+### Managed (capability-first)
+
+The wizard leads with geography, not paperwork:
+
+1. **"Where are your contacts located?"** — a **multi-select** of countries. Drives the whole
+   requirement mix; asked first.
+2. **Capabilities** — a section listing what's turned on. Number provisioning and Outbound Calling
+   are **always on** (non-interactive); the rest default on and are toggleable. Each row shows
+   **"Required for: [flags]"**; rows required in no chosen country are hidden.
 3. **Identity** — business information + authorized representative (the foundation).
 4. **Per-capability detail** — e.g. Text Messaging (privacy/ToS URLs), Caller ID Name (display name),
    shown only when the relevant capability/country is in scope.
-5. **Review & submit** — the entered identity and per-capability details, then "what happens next."
+5. **Review & submit** — entered identity + per-capability details, then "what happens next."
 
 Adding a country later (from Company Info) re-runs the same requirement assembly additively.
+
+### SIP trunk
+
+A single wizard configures both **origination** (inbound) and **termination** (outbound), captures
+the trunk's channel ceiling, and collects the **declared** numbers that route over the trunk. No
+regulatory pipeline runs; the trunk's capability set is fixed to voice (no Text Messaging, no Number
+Provisioning).
+
+### BYO Twilio
+
+Connect (authorize) → import numbers (selection from the discovered account inventory) → use. No
+regulatory pipeline; capability state is detected from the connected account.
 
 ---
 
 ## How it all fits together
 
-1. **The user navigates by capability; requirements are bookkeeping.** "I want to text" → the
-   system assembles and tracks the underlying requirements and shows a roll-up.
-2. **Identity is the single foundation.** One rule: a regulated capability needs the Company
-   verified. A Company has one home identity plus per-country bundles for added countries.
-3. **A Company spans multiple countries.** Capabilities union across them; each capability declares
-   the countries it's required for; countries can be added retroactively.
-4. **Capabilities auto-attach to numbers; the user does zero per-number config.** Singletons attach
-   automatically; value-carrying capabilities are single-value at MVP.
-5. **Requirement rejection cascades to capability usability** at the Company level, not per number.
-6. **Number provisioning is gated on the country being verified** for non-US bundle countries (the
-   bundle is both identity and provisioning right); US numbers are buyable as soon as the Company
-   exists. In-flight intent lives in a Provision, not on the number.
-7. **Rotation is capability-aware** — replacements auto-inherit capabilities.
-8. **BYO is the escape hatch** — gating bypassed, no auto-management, marginal by design.
+1. **The user navigates by capability; requirements are bookkeeping.** "I want to text" → the system
+   assembles and tracks the underlying requirements and shows a roll-up.
+2. **Identity and connectivity are orthogonal.** The Company answers *who you are*; the Source
+   answers *what pipe you use*. Both are switched through one picker.
+3. **Identity is the single foundation** for managed compliance. One rule: a regulated capability
+   needs the Company verified.
+4. **A Company spans multiple countries and multiple sources.** Capabilities union across countries;
+   each capability declares the countries it's required for; a Company can hold managed + BYO + SIP
+   pools at once.
+5. **Capabilities are source-aware** — they describe what the user enables *and* what a source
+   supports (SIP is voice-only).
+6. **Numbers pool by source; agents can span pools.** Capabilities auto-attach to managed numbers;
+   the user does zero per-number config.
+7. **Requirement rejection cascades to capability usability** at the Company level (managed); BYO/SIP
+   failures surface as runtime alerts instead.
+8. **Provisioning is gated on the country being verified** for non-US bundle countries; US numbers
+   are buyable as soon as the Company exists. In-flight intent lives in a Provision.
+9. **Rotation is capability-aware** and managed-only — replacements auto-inherit capabilities.
+10. **Escape hatches bypass gating** — BYO Twilio and SIP trunks just work; the customer owns the
+    consequences, and runtime problems surface in the notifications inbox.
 
 ---
 
 ## Open / deferred
 
 - **Per-agent value assignment + A/B testing** for Caller ID Name / Sender ID — the instance shape
-  is modeled at MVP so these bolt on additively (per-agent default reference, then a managed
-  experiment that splits values across an agent's number pool — preserving zero per-number config).
-- **Multiple Companies per account** (holdco/opco, agencies, separate legal entities) — modeled but
-  hidden at MVP. Multi-*country* now lives inside one Company; multiple *identities / legal entities*
-  still map to multiple Companies. Build the Company switcher / management surface only when a
-  segment actually runs several.
+  is modeled at MVP so these bolt on additively.
+- **Multiple Companies per account** (holdco/opco, agencies, separate legal entities) — modeled;
+  build the management surface only when a segment actually runs several.
 - **Per-country availability derivation** — capability roll-ups currently key off the home country;
-  fully evaluating each capability against each operating country's requirement set is the natural
-  next step as multi-country deepens.
-- **Contact-pool-driven provisioning** ("buy top states by my contact pool") — ties into CRM
-  integration work.
-- **Local-presence dialing** (a shared number pool, pick the number matching the callee's area code)
-  — in tension with strict one-number-one-agent ownership; revisit deliberately.
+  fully evaluating each capability against each operating country's requirement set is the next step.
+- **Contact-pool-driven provisioning** ("buy top states by my contact pool") — ties into CRM work.
+- **Local-presence dialing** (shared number pool, pick by callee area code) — in tension with strict
+  one-number-one-agent ownership; revisit deliberately.
 - **Toll-free numbers** — a distinct compliance track (Toll-Free Verification, not A2P).
-- **Capability expiration / renewal** — A2P/CNAM/bundles expire in reality; lifecycle has no
-  renewal path yet.
-- **External numbers beyond BYO** (port-in, Verified Caller IDs), **temporary disable / parking**,
-  **released-number cooldown/reuse**, **Alphanumeric Sender ID & Branded Calls** as live capabilities
-  — future.
-- **Audit log** — acquire/release and requirement status changes should emit auditable events; wire
-  the hooks as the state machines are built (important; cheap now, painful to backfill).
+- **Capability expiration / renewal** — A2P/CNAM/bundles expire in reality; no renewal path yet.
+- **Multi-provider connectivity beyond Twilio/SIP**, **port-in / Verified Caller IDs**, **temporary
+  disable / parking**, **released-number cooldown/reuse**, **Alphanumeric Sender ID & Branded Calls**
+  as live capabilities — future.
+- **Alert/notification depth** — the inbox is the surface; routing rules, digests, push, and
+  per-source escalation policies are a separate product track.
+- **Audit log** — acquire/release, requirement status changes, and source connect/disconnect should
+  emit auditable events; wire the hooks as the state machines are built.

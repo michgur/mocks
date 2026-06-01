@@ -4,6 +4,7 @@ import { Check, Clock, AlertTriangle, CircleDashed, Plus, ArrowLeft, ExternalLin
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { CompanySwitcher } from '@/components/CompanySwitcher'
+import { TwilioIcon } from '@/components/TwilioIcon'
 import { ZeroState } from '@/components/ZeroState'
 import { api } from '@/api/client'
 import { useCapabilityViews, useRequirements } from '@/api/useApi'
@@ -177,7 +178,7 @@ function ByoCapabilityCard({ kind }: { kind: CapabilityKind }) {
             rel="noreferrer"
             className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent"
           >
-            <img src="/twilio.svg" alt="" className="h-3.5 w-3.5" />
+            <TwilioIcon className="h-3.5 w-3.5" />
             Open {link.label}
             <ExternalLink className="h-3 w-3 text-muted-foreground" />
           </a>

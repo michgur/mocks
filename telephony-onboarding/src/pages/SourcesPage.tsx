@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Building2, Check, ChevronRight, Plus, Waypoints } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { ConnectTwilioModal } from '@/components/ConnectTwilioModal'
+import { TwilioIcon } from '@/components/TwilioIcon'
 import { useCompanyContext } from '@/state/CompanyContext'
 import { cn } from '@/lib/utils'
 import { COUNTRY_FLAGS, type Company } from '@/types'
@@ -51,7 +52,7 @@ export function SourcesPage() {
             onClick={() => navigate('/wizard?new_company=1')}
           />
           <AddRow
-            icon={<img src="/twilio.svg" alt="" className="h-4 w-4" />}
+            icon={<TwilioIcon className="h-4 w-4" />}
             label="BYO Twilio"
             hint="Connect your own Twilio account and import its numbers"
             onClick={() => setConnectOpen(true)}
@@ -93,7 +94,7 @@ function SourceRow({
     >
       <div className="flex h-9 w-9 items-center justify-center rounded-md bg-muted">
         {isByo ? (
-          <img src="/twilio.svg" alt="" className="h-4 w-4" />
+          <TwilioIcon className="h-4 w-4" />
         ) : (
           <Building2 className="h-4 w-4 text-muted-foreground" />
         )}

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Phone, Waypoints } from 'lucide-react'
 import { Button } from './ui/button'
 import { ConnectTwilioModal } from './ConnectTwilioModal'
+import { TwilioIcon } from './TwilioIcon'
 
 export function ZeroState({ onGetStarted }: { onGetStarted?: () => void } = {}) {
   const [connectOpen, setConnectOpen] = useState(false)
@@ -40,7 +41,7 @@ export function ZeroState({ onGetStarted }: { onGetStarted?: () => void } = {}) 
           className="w-full justify-center gap-2.5"
           onClick={() => setConnectOpen(true)}
         >
-          <img src="/twilio.svg" alt="" className="h-5 w-5" />
+          <TwilioIcon className="h-5 w-5" />
           Use your Twilio account
         </Button>
         <Button variant="outline" size="lg" className="w-full justify-center gap-2.5">
