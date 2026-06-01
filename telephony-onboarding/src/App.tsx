@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { CapabilitiesPage } from './pages/CapabilitiesPage'
 import { SourcesPage } from './pages/SourcesPage'
@@ -9,11 +9,11 @@ import { CompanyProvider } from './state/CompanyContext'
 
 export default function App() {
   return (
-    <BrowserRouter basename={import.meta.env.BASE_URL}>
+    <HashRouter>
       <CompanyProvider>
         <Routes>
           <Route element={<Layout />}>
-            <Route path="/" element={<Navigate to="/capabilities" replace />} />
+            <Route path="/" element={<Navigate to="/numbers" replace />} />
             <Route path="/capabilities" element={<CapabilitiesPage />} />
             <Route path="/sources" element={<SourcesPage />} />
             <Route path="/alerts" element={<AlertsPage />} />
@@ -23,6 +23,6 @@ export default function App() {
           <Route path="/wizard/:requirementId" element={<WizardPage />} />
         </Routes>
       </CompanyProvider>
-    </BrowserRouter>
+    </HashRouter>
   )
 }
