@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Info, Link2, Loader2, Phone, Plus, RefreshCw, ShieldCheck } from 'lucide-react'
+import { Info, Link2, Loader2, Phone, Plus, RefreshCw, ShieldAlert, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -46,7 +46,7 @@ function isCountryVerified(country: CountryCode, requirements: Requirement[]): b
 const NO_VERIFIED_COUNTRIES = new Set<CountryCode>()
 
 export function NumbersPage() {
-  const { currentCompany, loading: companyLoading } = useCompanyContext()
+  const { currentCompany, setCurrentCompanyId, loading: companyLoading } = useCompanyContext()
   const { agents, loading: agentsLoading } = useAgents(currentCompany?.id)
   const [zeroAddOpen, setZeroAddOpen] = useState(false)
 
@@ -86,6 +86,8 @@ export function NumbersPage() {
             onOpenChange={setZeroAddOpen}
             agent={agent}
             verifiedCountries={NO_VERIFIED_COUNTRIES}
+            firstRun
+            onCompanyCreated={setCurrentCompanyId}
           />
         </>
       )}
@@ -125,6 +127,7 @@ function AgentTabs() {
 /* ── Agent detail ────────────────────────────────────────────────────── */
 
 function AgentDetail({ agent, company }: { agent: Agent; company: Company }) {
+  const navigate = useNavigate()
   const { numbers } = useNumbers(agent.id)
   const { provisions } = useProvisions(agent.id)
   const { requirements } = useRequirements(agent.companyId)
@@ -139,9 +142,29 @@ function AgentDetail({ agent, company }: { agent: Agent; company: Company }) {
     [requirements]
   )
 
+  // Managed company with any country not yet verified (e.g. the user skipped to
+  // grab US numbers). The modal stays quiet after the zero state, but the Phone
+  // numbers tab keeps nudging them to verify — calling works, texting/CNAM don't.
+  const unverified = !byo && company.countries.some((c) => !verifiedCountries.has(c))
+
   return (
     <div className="grid grid-cols-[1fr_300px] items-start gap-6">
       <div className="space-y-3">
+        {unverified && (
+          <Card className="flex items-start gap-3 border-warning/30 bg-warning/5 px-5 py-3.5">
+            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+            <div className="flex-1 text-sm">
+              <div className="font-medium">Your business isn't verified yet</div>
+              <div className="mt-0.5 text-xs text-muted-foreground">
+                Calls work now but may be flagged as spam. Texting and caller ID stay off until your
+                business is verified.
+              </div>
+            </div>
+            <Button size="sm" className="shrink-0" onClick={() => navigate('/wizard')}>
+              Verify business
+            </Button>
+          </Card>
+        )}
         {provisions.map((p) => (
           <ProvisionRow key={p.id} provision={p} />
         ))}
@@ -437,32 +460,82 @@ function AddNumbersModal({
   onOpenChange,
   agent,
   verifiedCountries,
+  firstRun,
+  onCompanyCreated,
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
   agent: Agent
   verifiedCountries: Set<CountryCode>
+  // Zero state: no company exists yet, so US-only picks can skip straight into
+  // an unverified company instead of being forced through onboarding.
+  firstRun?: boolean
+  onCompanyCreated?: (id: string) => void
 }) {
   const navigate = useNavigate()
   const [selections, setSelections] = useState<GeoSelection[]>([])
   const [submitting, setSubmitting] = useState(false)
 
   const total = selections.reduce((sum, s) => sum + s.count, 0)
-  // Reserve mode kicks in if any picked region isn't verified yet: we hold the
-  // whole roster and send the user into onboarding to get verified.
-  const reserve = selections.some((s) => !verifiedCountries.has(s.geo.country))
   const noun = total === 1 ? 'number' : 'numbers'
 
-  const onSubmit = async () => {
+  // Non-US bundle countries are a hard provisioning gate; US numbers are not.
+  const hasUnverifiedNonUs =
+    total > 0 && selections.some((s) => s.geo.country !== 'US' && !verifiedCountries.has(s.geo.country))
+  const usOnly = total > 0 && selections.every((s) => s.geo.country === 'US')
+  const usOnlyUnverified = usOnly && !selections.every((s) => verifiedCountries.has(s.geo.country))
+
+  // Zero state + US-only: offer a skip (add now, unverified) beside Verify.
+  const canSkip = !!firstRun && usOnlyUnverified
+  // A non-US unverified region forces verification first (the bundle is required).
+  const mustVerify = hasUnverifiedNonUs
+  // Everything else (verified, or US-only after the first run) just adds directly —
+  // the user already made their choice; don't nag them about verification again.
+
+  const run = async (mode: 'add' | 'skip' | 'verify') => {
     setSubmitting(true)
     try {
+      const countries = Array.from(new Set(selections.map((s) => s.geo.country)))
+
+      if (mode === 'skip') {
+        // Stand up an unverified US company, attach the numbers to its default
+        // agent, and switch into it. Calling works; texting/caller ID stay off.
+        const created = await api.createCompany({
+          name: 'New company',
+          country: 'US',
+          countries: ['US'],
+        })
+        const ags = await api.listAgents(created.id)
+        const target = ags[0] ?? agent
+        for (const { geo, count } of selections) {
+          await api.addNumbers(target.id, { count, country: geo.country, region: geo.region })
+        }
+        setSelections([])
+        onOpenChange(false)
+        onCompanyCreated?.(created.id)
+        return
+      }
+
+      if (mode === 'verify') {
+        // Reserve against the existing company before routing into onboarding;
+        // in the zero state there's no company yet, so just carry the countries.
+        if (!firstRun) {
+          for (const { geo, count } of selections) {
+            await api.addNumbers(agent.id, { count, country: geo.country, region: geo.region })
+          }
+        }
+        setSelections([])
+        onOpenChange(false)
+        navigate(`/wizard?countries=${countries.join(',')}`)
+        return
+      }
+
+      // mode === 'add'
       for (const { geo, count } of selections) {
         await api.addNumbers(agent.id, { count, country: geo.country, region: geo.region })
       }
-      const countries = Array.from(new Set(selections.map((s) => s.geo.country)))
       setSelections([])
       onOpenChange(false)
-      if (reserve) navigate(`/wizard?countries=${countries.join(',')}`)
     } finally {
       setSubmitting(false)
     }
@@ -481,13 +554,23 @@ function AddNumbersModal({
 
         <GeoPicker value={selections} onChange={setSelections} />
 
-        {reserve && (
+        {mustVerify && (
           <div className="flex gap-2.5 rounded-md border border-warning/30 bg-warning/5 px-3 py-2.5 text-xs text-muted-foreground">
             <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
             <span>
-              Carriers require a verified business before issuing numbers in each region. We'll hold
+              Carriers require a verified business before issuing numbers outside the US. We'll hold
               this request and start acquiring the moment you're verified — next we'll collect the
               business details needed to get you approved.
+            </span>
+          </div>
+        )}
+
+        {canSkip && (
+          <div className="flex gap-2.5 rounded-md border border-warning/30 bg-warning/5 px-3 py-2.5 text-xs text-muted-foreground">
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+            <span>
+              US numbers are available right away. Calls will work, but may be flagged as spam, and
+              texting and caller ID stay off until you verify your business. You can verify anytime.
             </span>
           </div>
         )}
@@ -496,15 +579,24 @@ function AddNumbersModal({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
             Cancel
           </Button>
-          <Button onClick={onSubmit} disabled={submitting || total === 0}>
-            {submitting
-              ? reserve
-                ? 'Reserving…'
-                : 'Adding…'
-              : reserve
-                ? 'Verify company'
-                : `Add ${total} ${noun}`}
-          </Button>
+          {canSkip ? (
+            <>
+              <Button variant="ghost" onClick={() => run('skip')} disabled={submitting}>
+                {submitting ? 'Adding…' : `Skip & add ${total} ${noun}`}
+              </Button>
+              <Button onClick={() => run('verify')} disabled={submitting}>
+                Verify business
+              </Button>
+            </>
+          ) : mustVerify ? (
+            <Button onClick={() => run('verify')} disabled={submitting || total === 0}>
+              {submitting ? 'Reserving…' : 'Verify business'}
+            </Button>
+          ) : (
+            <Button onClick={() => run('add')} disabled={submitting || total === 0}>
+              {submitting ? 'Adding…' : `Add ${total} ${noun}`}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

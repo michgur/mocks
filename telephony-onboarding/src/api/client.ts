@@ -325,23 +325,25 @@ export const api = {
     return structuredClone(agentId ? active.filter((n) => n.agentId === agentId) : active)
   },
 
-  // Add numbers to an agent. Creates a Provision; if the Company is verified
-  // it fulfills immediately, otherwise it waits on verification.
+  // Add numbers to an agent. Creates a Provision; US numbers are buyable as soon
+  // as the company exists, so they fulfill immediately even before verification.
+  // Non-US bundle countries gate provisioning on the bundle, so they wait.
   async addNumbers(agentId: string, spec: ProvisionSpec): Promise<Provision> {
     await delay(500)
     const agent = store.agents.find((a) => a.id === agentId)
     const verified = agent ? isCompanyVerified(agent.companyId, spec.country) : false
+    const buyable = verified || spec.country === 'US'
     const provision: Provision = {
       id: uid('prov'),
       agentId,
       spec,
-      status: verified ? 'pending' : 'waiting_on_verification',
+      status: buyable ? 'pending' : 'waiting_on_verification',
       acquiredNumberIds: [],
       createdAt: new Date().toISOString(),
     }
     store.provisions.push(provision)
     store.notify()
-    if (verified) startProvisioning(provision)
+    if (buyable) startProvisioning(provision)
     return structuredClone(provision)
   },
 

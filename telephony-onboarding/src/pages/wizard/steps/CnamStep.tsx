@@ -11,21 +11,15 @@ interface Props {
 
 export function CnamStep({ state, update, rejectionMessage, rejectionField }: Props) {
   return (
-    <div>
-      <h1 className="text-2xl font-semibold tracking-tight">Caller ID name</h1>
-      <p className="mt-2 text-sm text-muted-foreground">
-        The brand name carriers will display on outbound calls. Max 15 characters. Must closely
-        match your registered business name.
-      </p>
-
+    <div className="space-y-4">
       {rejectionMessage && (
-        <div className="mt-6 rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm">
+        <div className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm">
           <div className="font-medium text-destructive">Rejected by carrier</div>
           <div className="mt-1 text-destructive/90">{rejectionMessage}</div>
         </div>
       )}
 
-      <div className="mt-6">
+      <div>
         <div
           className={
             rejectionField === 'displayName'

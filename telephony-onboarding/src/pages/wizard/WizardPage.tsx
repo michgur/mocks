@@ -13,17 +13,14 @@ import { WizardLayout } from './WizardLayout'
 import {
   computeVisibleSteps,
   emptyWizardState,
+  missingRequiredFields,
   plannedRequirementTypes,
   validateStep,
   type WizardFormState,
   type WizardStepId,
 } from './wizardState'
 import { ChannelsStep } from './steps/ChannelsStep'
-import { BusinessInfoStep } from './steps/BusinessInfoStep'
-import { AuthorizedRepStep } from './steps/AuthorizedRepStep'
-import { MessagingStep } from './steps/MessagingStep'
-import { CnamStep } from './steps/CnamStep'
-import { ReviewStep } from './steps/ReviewStep'
+import { ConfirmStep } from './steps/ConfirmStep'
 
 const CREATED_BY = 'gur@harmony.ai'
 
@@ -51,6 +48,10 @@ export function WizardPage() {
   const [config, setConfig] = useState<WizardConfig | null>(null)
   const [currentStep, setCurrentStep] = useState<WizardStepId>('channels')
   const [submitting, setSubmitting] = useState(false)
+  // Implicit AI fill: `aiActive` drives the banner (Clear ⇄ Undo); `aiSnapshot`
+  // retains the filled values so Undo can repaint them after a Clear.
+  const [aiActive, setAiActive] = useState(false)
+  const [aiSnapshot, setAiSnapshot] = useState<AiFillPatch | null>(null)
 
   // Configure the wizard once the company context has settled.
   useEffect(() => {
@@ -64,7 +65,7 @@ export function WizardPage() {
         if (cancelled) return
         if (!req) {
           setConfig({ includeChannels: false, needIdentity: false })
-          setCurrentStep('review')
+          setCurrentStep('confirm')
           return
         }
         const company = (await api.listCompanies()).find((c) => c.id === req.companyId)
@@ -81,12 +82,11 @@ export function WizardPage() {
           cnam: req.data.cnam ?? {},
         }
         const cfg: WizardConfig = { includeChannels: false, needIdentity: isIdentity, editing: req }
-        const visible = computeVisibleSteps(next, cfg)
+        // Editing an existing requirement: show real submitted values, not AI guesses.
         setState(next)
         setConfig(cfg)
-        setCurrentStep(
-          req.rejection ? mapFieldToStep(req.rejection.field) ?? visible[0] : visible[0]
-        )
+        setAiActive(false)
+        setCurrentStep('confirm')
         return
       }
 
@@ -97,25 +97,32 @@ export function WizardPage() {
         if (cancelled) return
         const idType = identityRequirementType(country)
         const needIdentity = !reqs.some((r) => r.type === idType)
-        const next: WizardFormState = {
+        const base: WizardFormState = {
           ...emptyWizardState,
           country,
           countries: currentCompany.countries,
           capabilities: [capabilityParam],
         }
-        const cfg: WizardConfig = { includeChannels: false, needIdentity }
-        const visible = computeVisibleSteps(next, cfg)
-        setState(next)
-        setConfig(cfg)
-        setCurrentStep(visible[0])
+        const fill = aiPrefill(base, currentCompany.name)
+        setState({ ...base, ...fill })
+        setAiSnapshot(fill)
+        setAiActive(true)
+        setConfig({ includeChannels: false, needIdentity })
+        setCurrentStep('confirm')
         return
       }
 
       // ── New company onboarding (channels-first) ─────────────────────────
-      setState((s) => {
-        const countries = prefillCountries ?? currentCompany?.countries ?? s.countries
-        return { ...s, country: countries[0] ?? 'US', countries }
-      })
+      const countries = prefillCountries ?? currentCompany?.countries ?? emptyWizardState.countries
+      const base: WizardFormState = {
+        ...emptyWizardState,
+        country: countries[0] ?? 'US',
+        countries,
+      }
+      const fill = aiPrefill(base, currentCompany?.name)
+      setState({ ...base, ...fill })
+      setAiSnapshot(fill)
+      setAiActive(true)
       setConfig({ includeChannels: true, needIdentity: true })
       setCurrentStep('channels')
     }
@@ -147,6 +154,19 @@ export function WizardPage() {
 
   const update = (patch: Partial<WizardFormState>) => setState((s) => ({ ...s, ...patch }))
 
+  // The banner's Clear empties the AI-filled sections but keeps the snapshot, so
+  // Undo can repaint them — Clear is reversible, not destructive.
+  const onClearAi = () => {
+    // Only clear what Sienna filled. The representative is known from registration,
+    // and title/position are the user's own input — both survive a clear.
+    setState((s) => ({ ...s, business: {}, messaging: {}, cnam: {} }))
+    setAiActive(false)
+  }
+  const onUndoAi = () => {
+    if (aiSnapshot) setState((s) => ({ ...s, ...aiSnapshot }))
+    setAiActive(true)
+  }
+
   const currentIndex = steps.indexOf(currentStep)
   const isLast = currentIndex === steps.length - 1
 
@@ -154,9 +174,6 @@ export function WizardPage() {
   const onCancel = () => done()
   const onBack = () => {
     if (currentIndex > 0) setCurrentStep(steps[currentIndex - 1])
-  }
-  const goToStep = (s: WizardStepId) => {
-    if (steps.includes(s)) setCurrentStep(s)
   }
 
   const onNext = async () => {
@@ -233,42 +250,11 @@ export function WizardPage() {
     }
   }
 
-  const stepErrors = validateStep(state, currentStep)
+  const stepErrors =
+    currentStep === 'confirm'
+      ? missingRequiredFields(state, { needIdentity: config.needIdentity })
+      : validateStep(state, currentStep)
   const nextDisabled = stepErrors.length > 0 || submitting
-
-  const insertMockData = () =>
-    setState((s) => ({
-      ...s,
-      capabilities: s.capabilities.length > 0 ? s.capabilities : ['calling', 'texting', 'branded_caller_id'],
-      business: {
-        legalName: 'Acme Inc.',
-        registrationType: 'EIN',
-        registrationNumber: '12-3456789',
-        addressLine1: '123 Market St',
-        city: 'San Francisco',
-        state: 'CA',
-        postalCode: '94103',
-        country: s.country,
-        companyType: 'LLC',
-        businessType: 'For-profit',
-        industry: 'Healthcare',
-        regionsOfOperation: ['United States'],
-        website: 'https://acme.example',
-      },
-      representative: {
-        firstName: 'Jamie',
-        lastName: 'Chen',
-        email: 'jamie@acme.example',
-        phone: '+1 415 555 1212',
-        title: 'COO',
-        position: 'Authorized Representative',
-      },
-      messaging: {
-        privacyPolicyUrl: 'https://acme.example/privacy',
-        termsOfServiceUrl: 'https://acme.example/terms',
-      },
-      cnam: { displayName: 'Acme' },
-    }))
 
   const editingType = config.editing?.type
 
@@ -281,7 +267,6 @@ export function WizardPage() {
       onNext={onNext}
       nextLabel={isLast ? (submitting ? 'Submitting…' : 'Submit') : 'Next'}
       nextDisabled={nextDisabled}
-      onInsertMockData={insertMockData}
     >
       {currentStep === 'channels' && (
         <ChannelsStep
@@ -290,29 +275,26 @@ export function WizardPage() {
           lockCountry={!!currentCompany && !newCompanyParam && !prefillCountries}
         />
       )}
-      {currentStep === 'business' && (
-        <BusinessInfoStep
+      {currentStep === 'confirm' && (
+        <ConfirmStep
           state={state}
           update={update}
-          rejectionField={config.editing?.rejection?.field}
-          rejectionMessage={editingType === identityRequirementType(state.country) ? config.editing?.rejection?.message : undefined}
+          showIdentity={config.needIdentity}
+          aiActive={aiActive}
+          onClearAi={onClearAi}
+          onUndoAi={onUndoAi}
+          businessRejectionField={config.editing?.rejection?.field}
+          businessRejectionMessage={
+            editingType === identityRequirementType(state.country)
+              ? config.editing?.rejection?.message
+              : undefined
+          }
+          cnamRejectionField={editingType === 'cnam' ? config.editing?.rejection?.field : undefined}
+          cnamRejectionMessage={editingType === 'cnam' ? config.editing?.rejection?.message : undefined}
         />
-      )}
-      {currentStep === 'representative' && <AuthorizedRepStep state={state} update={update} />}
-      {currentStep === 'messaging' && <MessagingStep state={state} update={update} />}
-      {currentStep === 'cnam' && (
-        <CnamStep
-          state={state}
-          update={update}
-          rejectionMessage={editingType === 'cnam' ? config.editing?.rejection?.message : undefined}
-          rejectionField={editingType === 'cnam' ? config.editing?.rejection?.field : undefined}
-        />
-      )}
-      {currentStep === 'review' && (
-        <ReviewStep state={state} goToStep={goToStep} showIdentity={config.needIdentity} />
       )}
 
-      {currentStep !== 'channels' && currentStep !== 'review' && stepErrors.length > 0 && (
+      {currentStep === 'confirm' && stepErrors.length > 0 && (
         <div className="mt-6 text-xs text-muted-foreground">
           Fill in all required fields to continue.
         </div>
@@ -351,12 +333,34 @@ function dataForType(t: RequirementType, state: WizardFormState): Record<string,
   }
 }
 
-function mapFieldToStep(field?: string): WizardStepId | undefined {
-  if (!field) return undefined
-  if (['legalName', 'registrationNumber', 'registrationType', 'address', 'website', 'industry'].includes(field))
-    return 'business'
-  if (['privacyPolicyUrl', 'termsOfServiceUrl'].includes(field)) return 'messaging'
-  if (['displayName'].includes(field)) return 'cnam'
-  if (['firstName', 'lastName', 'email', 'phone', 'title'].includes(field)) return 'representative'
-  return undefined
+type AiFillPatch = Pick<WizardFormState, 'business' | 'messaging' | 'cnam'>
+
+// Stand-in for Sienna, the research agent: derives what's publicly discoverable
+// from the company name + the user's email domain. Deliberately leaves the fields
+// it can't find empty — the private registration/EIN number. The representative is
+// not AI-filled: it's the signed-in user, known from registration.
+function aiPrefill(state: WizardFormState, companyName?: string): AiFillPatch {
+  const name = (companyName ?? 'Acme Inc.').trim()
+  const domain = CREATED_BY.split('@')[1] ?? 'example.com'
+  const site = `https://${domain}`
+  const cnam = name.replace(/\b(inc|llc|ltd|co|corp)\.?$/i, '').trim().slice(0, 15)
+  return {
+    business: {
+      legalName: name,
+      registrationType: 'EIN',
+      addressLine1: '548 Market St',
+      city: 'San Francisco',
+      state: 'CA',
+      postalCode: '94104',
+      country: state.country,
+      companyType: 'Corporation',
+      industry: 'Technology',
+      website: site,
+    },
+    messaging: {
+      privacyPolicyUrl: `${site}/privacy`,
+      termsOfServiceUrl: `${site}/terms`,
+    },
+    cnam: { displayName: cnam },
+  }
 }

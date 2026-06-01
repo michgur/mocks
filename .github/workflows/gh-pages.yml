@@ -39,6 +39,10 @@ jobs:
           mkdir -p dist/telephony
           cp -r telephony-onboarding/dist/. dist/telephony/
 
+      - name: Copy MODEL.md into telephony Pages root
+        run: |
+          cp number-management/MODEL.md dist/telephony/
+
       - name: Copy crm-integration into Pages root
         run: |
           mkdir -p dist/crm

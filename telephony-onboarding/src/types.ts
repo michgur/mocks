@@ -259,7 +259,7 @@ export interface Provision {
 /* ── Labels & catalog metadata ───────────────────────────────────────── */
 
 export const CAPABILITY_LABELS: Record<CapabilityKind, string> = {
-  calling: 'Outbound Calling',
+  calling: 'Verified Calling',
   texting: 'Text Messaging',
   branded_caller_id: 'Caller ID Name',
   caller_id_passthrough: 'Caller ID Passthrough',
@@ -267,7 +267,7 @@ export const CAPABILITY_LABELS: Record<CapabilityKind, string> = {
 }
 
 export const CAPABILITY_DESCRIPTIONS: Record<CapabilityKind, string> = {
-  calling: 'Place outbound calls to your contacts.',
+  calling: 'Verify your business so outbound calls are signed (STIR/SHAKEN) and less likely to be flagged as spam. Also unlocks texting and caller ID.',
   texting: 'Send SMS and MMS to your contacts.',
   branded_caller_id: 'Show your business name on outbound calls.',
   caller_id_passthrough: 'Display your own verified numbers as the caller ID.',

@@ -10,13 +10,10 @@ import {
   type RequirementType,
 } from '@/types'
 
-export type WizardStepId =
-  | 'channels'
-  | 'business'
-  | 'representative'
-  | 'messaging'
-  | 'cnam'
-  | 'review'
+// The wizard is two screens: the user states intent (channels), then confirms a
+// mostly AI-prefilled page that folds in identity, representative, messaging and
+// CNAM. There is no separate review — the confirm page *is* the review.
+export type WizardStepId = 'channels' | 'confirm'
 
 export interface WizardFormState {
   // `country` is the primary country (drives the identity / requirement mix);
@@ -35,7 +32,14 @@ export const emptyWizardState: WizardFormState = {
   countries: ['US'],
   capabilities: ['calling', 'texting', 'branded_caller_id', 'caller_id_passthrough'],
   business: {},
-  representative: {},
+  // The representative defaults to the signed-in user — known from registration,
+  // not AI-researched. Only the title/position are asked for on the confirm page.
+  representative: {
+    firstName: 'Michael',
+    lastName: 'Gur',
+    email: 'gur@harmony.ai',
+    phone: '+1 415 555 0142',
+  },
   messaging: {},
   cnam: {},
 }
@@ -45,62 +49,60 @@ interface VisibleStepOpts {
   needIdentity: boolean // whether the business/rep (identity) steps are needed
 }
 
-export function computeVisibleSteps(state: WizardFormState, opts: VisibleStepOpts): WizardStepId[] {
+export function computeVisibleSteps(_state: WizardFormState, opts: VisibleStepOpts): WizardStepId[] {
   const steps: WizardStepId[] = []
   if (opts.includeChannels) steps.push('channels')
-  if (opts.needIdentity) {
-    steps.push('business')
-    steps.push('representative')
-  }
-  if (state.capabilities.includes('texting') && state.countries.includes('US')) steps.push('messaging')
-  if (state.capabilities.includes('branded_caller_id')) steps.push('cnam')
-  steps.push('review')
+  steps.push('confirm')
   return steps
 }
 
 export const STEP_TITLES: Record<WizardStepId, string> = {
-  channels: 'Capabilities',
-  business: 'Business information',
-  representative: 'Authorized representative',
-  messaging: 'Text messaging',
-  cnam: 'Caller ID name',
-  review: 'Review',
+  channels: 'Requirements',
+  confirm: 'Company Info',
+}
+
+const BUSINESS_REQUIRED: (keyof BusinessProfileData)[] = [
+  'legalName',
+  'registrationType',
+  'registrationNumber',
+  'addressLine1',
+  'city',
+  'postalCode',
+  'country',
+  'companyType',
+  'industry',
+]
+const REP_REQUIRED: (keyof AuthorizedRepData)[] = ['firstName', 'lastName', 'email', 'phone', 'title']
+const MESSAGING_REQUIRED: (keyof MessagingData)[] = ['privacyPolicyUrl', 'termsOfServiceUrl']
+
+export function showMessaging(state: WizardFormState): boolean {
+  return state.capabilities.includes('texting') && state.countries.includes('US')
+}
+
+export function showCnam(state: WizardFormState): boolean {
+  return state.capabilities.includes('branded_caller_id')
+}
+
+// Required fields still empty on the confirm page, as plain field keys. The
+// confirm UI maps these to labels + anchors so the "needs you" callout can link
+// straight to them (the fields AI can't fill: EIN, representative title).
+export function missingRequiredFields(
+  state: WizardFormState,
+  opts: { needIdentity: boolean }
+): string[] {
+  const out: string[] = []
+  if (opts.needIdentity) {
+    for (const k of BUSINESS_REQUIRED) if (!state.business[k]) out.push(k)
+    for (const k of REP_REQUIRED) if (!state.representative[k]) out.push(k)
+  }
+  if (showMessaging(state)) for (const k of MESSAGING_REQUIRED) if (!state.messaging[k]) out.push(k)
+  if (showCnam(state) && !state.cnam.displayName) out.push('displayName')
+  return out
 }
 
 export function validateStep(state: WizardFormState, step: WizardStepId): string[] {
-  switch (step) {
-    case 'channels':
-      return state.capabilities.length === 0 ? ['capabilities'] : []
-    case 'business': {
-      const b = state.business
-      const required: (keyof BusinessProfileData)[] = [
-        'legalName',
-        'registrationType',
-        'registrationNumber',
-        'addressLine1',
-        'city',
-        'postalCode',
-        'country',
-        'companyType',
-        'industry',
-      ]
-      return required.filter((k) => !b[k]).map(String)
-    }
-    case 'representative': {
-      const r = state.representative
-      const required: (keyof AuthorizedRepData)[] = ['firstName', 'lastName', 'email', 'phone', 'title']
-      return required.filter((k) => !r[k]).map(String)
-    }
-    case 'messaging': {
-      const m = state.messaging
-      const required: (keyof MessagingData)[] = ['privacyPolicyUrl', 'termsOfServiceUrl']
-      return required.filter((k) => !m[k]).map(String)
-    }
-    case 'cnam':
-      return state.cnam.displayName ? [] : ['displayName']
-    case 'review':
-      return []
-  }
+  if (step === 'channels') return state.capabilities.length === 0 ? ['capabilities'] : []
+  return [] // 'confirm' is validated via missingRequiredFields (needs needIdentity)
 }
 
 // The regulated requirement types we'll create from the selected capabilities,

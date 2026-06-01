@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { Check, ChevronDown } from 'lucide-react'
-import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
   CAPABILITY_DESCRIPTIONS,
@@ -174,11 +173,10 @@ function CountryMultiSelect({
 
   return (
     <div className="relative w-full max-w-md" ref={ref}>
-      <Label className="text-sm font-medium">Countries</Label>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="mt-1.5 flex w-full items-center justify-between gap-2 rounded-md border bg-background px-3 py-2 text-sm transition-colors hover:bg-accent"
+        className="flex w-full items-center justify-between gap-2 rounded-md border bg-background px-3 py-2 text-sm transition-colors hover:bg-accent"
       >
         <span className="flex flex-wrap items-center gap-1.5">
           {selected.length === 0 ? (

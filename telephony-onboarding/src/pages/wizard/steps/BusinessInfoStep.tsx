@@ -7,6 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { cn } from '@/lib/utils'
 import type { WizardFormState } from '../wizardState'
 import type { BusinessProfileData, CountryCode } from '@/types'
 import { COUNTRY_LABELS, SUPPORTED_COUNTRIES } from '@/types'
@@ -14,30 +15,25 @@ import { COUNTRY_LABELS, SUPPORTED_COUNTRIES } from '@/types'
 interface Props {
   state: WizardFormState
   update: (patch: Partial<WizardFormState>) => void
+  aiActive?: boolean
   focusedField?: string
   rejectionField?: string
   rejectionMessage?: string
 }
 
-export function BusinessInfoStep({ state, update, focusedField, rejectionField, rejectionMessage }: Props) {
+export function BusinessInfoStep({ state, update, aiActive, focusedField, rejectionField, rejectionMessage }: Props) {
   const set = (patch: Partial<BusinessProfileData>) =>
     update({ business: { ...state.business, ...patch } })
 
   return (
-    <div>
-      <h1 className="text-2xl font-semibold tracking-tight">Business information</h1>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Carrier registration requires details about your registered business entity.
-      </p>
-
+    <div className="space-y-4">
       {rejectionMessage && (
-        <div className="mt-6 rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm">
+        <div className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm">
           <div className="font-medium text-destructive">Rejected by carrier</div>
           <div className="mt-1 text-destructive/90">{rejectionMessage}</div>
         </div>
       )}
 
-      <div className="mt-6 space-y-4">
         <Field
           label="Legal business name"
           hint="Exact name as it appears on official registration documents"
@@ -67,7 +63,13 @@ export function BusinessInfoStep({ state, update, focusedField, rejectionField, 
               </SelectContent>
             </Select>
           </Field>
-          <Field label="Registration number" highlighted={rejectionField === 'registrationNumber'}>
+          <Field
+            id="field-registrationNumber"
+            label="Registration number"
+            hint="Private — we can't look this up for you."
+            highlighted={rejectionField === 'registrationNumber'}
+            attention={aiActive && !state.business.registrationNumber}
+          >
             <Input
               value={state.business.registrationNumber ?? ''}
               onChange={(e) => set({ registrationNumber: e.target.value })}
@@ -165,14 +167,13 @@ export function BusinessInfoStep({ state, update, focusedField, rejectionField, 
           </Field>
         </div>
 
-        <Field label="Website">
-          <Input
-            value={state.business.website ?? ''}
-            onChange={(e) => set({ website: e.target.value })}
-            placeholder="https://acme.example"
-          />
-        </Field>
-      </div>
+      <Field label="Website">
+        <Input
+          value={state.business.website ?? ''}
+          onChange={(e) => set({ website: e.target.value })}
+          placeholder="https://acme.example"
+        />
+      </Field>
     </div>
   )
 }
@@ -183,16 +184,25 @@ function Field({
   children,
   autoFocus,
   highlighted,
+  attention,
+  id,
 }: {
   label: string
   hint?: string
   children: React.ReactNode
   autoFocus?: boolean
   highlighted?: boolean
+  attention?: boolean
+  id?: string
 }) {
   return (
     <div
-      className={highlighted ? 'rounded-md ring-2 ring-destructive/40 ring-offset-2 ring-offset-background -m-1 p-1' : ''}
+      id={id}
+      className={cn(
+        'scroll-mt-24',
+        highlighted && 'rounded-md ring-2 ring-destructive/40 ring-offset-2 ring-offset-background -m-1 p-1',
+        attention && !highlighted && 'rounded-md ring-2 ring-amber-400/60 ring-offset-2 ring-offset-background -m-1 p-1'
+      )}
       ref={(el) => {
         if (autoFocus && el) {
           const input = el.querySelector<HTMLInputElement>('input, [role="combobox"]')
