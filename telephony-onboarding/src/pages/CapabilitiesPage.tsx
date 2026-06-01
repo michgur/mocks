@@ -39,7 +39,12 @@ export function CapabilitiesPage() {
   }
 
   if (!currentCompany) {
-    return <ZeroState />
+    return (
+      <div>
+        <TelephonyHeader showActions={false} />
+        <ZeroState />
+      </div>
+    )
   }
 
   // BYO companies skip our regulatory layer entirely — registrations live in
@@ -72,7 +77,7 @@ export function CapabilitiesPage() {
 
 /* ── Shared top row: page title + Source picker ──────────────────────── */
 
-function TelephonyHeader() {
+function TelephonyHeader({ showActions = true }: { showActions?: boolean }) {
   return (
     <div className="mb-6 flex items-center justify-between gap-4">
       <h1 className="flex items-center gap-1.5 text-2xl font-semibold tracking-tight">
@@ -80,20 +85,22 @@ function TelephonyHeader() {
         <span className="text-muted-foreground/50">/</span>
         <span>Telephony</span>
       </h1>
-      <div className="flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-muted-foreground hover:text-foreground"
-          asChild
-        >
-          <Link to="/sources">
-            <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
-            See all sources
-          </Link>
-        </Button>
-        <CompanySwitcher />
-      </div>
+      {showActions && (
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-foreground"
+            asChild
+          >
+            <Link to="/sources">
+              <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
+              See all sources
+            </Link>
+          </Button>
+          <CompanySwitcher />
+        </div>
+      )}
     </div>
   )
 }
