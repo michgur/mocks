@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Info, Link2, Loader2, Phone, Plus, RefreshCw, ShieldAlert, ShieldCheck } from 'lucide-react'
+import { Clock, Info, Link2, Loader2, Phone, Plus, RefreshCw, ShieldAlert, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -72,12 +72,7 @@ export function NumbersPage() {
       <AgentTabs />
 
       {currentCompany ? (
-        <>
-          <div className="mb-5 flex justify-end">
-            <CompanySwitcher />
-          </div>
-          <AgentDetail key={agent.id} agent={agent} company={currentCompany} />
-        </>
+        <AgentDetail key={agent.id} agent={agent} company={currentCompany} />
       ) : (
         <>
           <ZeroState onGetStarted={() => setZeroAddOpen(true)} />
@@ -147,36 +142,73 @@ function AgentDetail({ agent, company }: { agent: Agent; company: Company }) {
   // numbers tab keeps nudging them to verify — calling works, texting/CNAM don't.
   const unverified = !byo && company.countries.some((c) => !verifiedCountries.has(c))
 
-  return (
-    <div className="grid grid-cols-[1fr_300px] items-start gap-6">
-      <div className="space-y-3">
-        {unverified && (
-          <Card className="flex items-start gap-3 border-warning/30 bg-warning/5 px-5 py-3.5">
-            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-            <div className="flex-1 text-sm">
-              <div className="font-medium">Your business isn't verified yet</div>
-              <div className="mt-0.5 text-xs text-muted-foreground">
-                Calls work now but may be flagged as spam. Texting and caller ID stay off until your
-                business is verified.
-              </div>
-            </div>
-            <Button size="sm" className="shrink-0" onClick={() => navigate('/wizard')}>
-              Verify business
-            </Button>
-          </Card>
-        )}
-        {provisions.map((p) => (
-          <ProvisionRow key={p.id} provision={p} />
-        ))}
-        <NumbersTable
-          numbers={numbers}
-          byo={byo}
-          onAddClick={() => (byo ? setImportOpen(true) : setAddOpen(true))}
-          onReleaseClick={(n) => setReleaseTarget(n)}
-        />
-      </div>
+  // Verification submitted but not yet approved — the foundation requirement is
+  // in review (or waiting on a prerequisite). We show a status banner instead of
+  // nudging the user to start verification they've already started.
+  const inReview = useMemo(
+    () =>
+      !byo &&
+      company.countries.some((c) => {
+        const t = identityRequirementType(c)
+        return requirements.some(
+          (r) => r.type === t && (r.status === 'in_review' || r.status === 'waiting')
+        )
+      }),
+    [byo, company.countries, requirements]
+  )
 
-      <AgentSettingsCard agent={agent} byo={byo} />
+  return (
+    <div className="space-y-3">
+      {unverified &&
+        (inReview ? (
+            <Card className="flex items-start gap-3 border-primary/30 bg-primary/5 px-5 py-3.5">
+              <Clock className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+              <div className="flex-1 text-sm">
+                <div className="font-medium">Verifying your business</div>
+                <div className="mt-0.5 text-xs text-muted-foreground">
+                  We're reviewing your details with carriers. Calls work now; texting and caller ID
+                  turn on once you're approved.
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+                onClick={() => navigate('/capabilities')}
+              >
+                View status
+              </Button>
+            </Card>
+          ) : (
+            <Card className="flex items-start gap-3 border-warning/30 bg-warning/5 px-5 py-3.5">
+              <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+              <div className="flex-1 text-sm">
+                <div className="font-medium">Your business isn't verified yet</div>
+                <div className="mt-0.5 text-xs text-muted-foreground">
+                  Calls work now but may be flagged as spam. Texting and caller ID stay off until
+                  your business is verified.
+                </div>
+              </div>
+              <Button
+                size="sm"
+                className="shrink-0"
+                onClick={() => navigate('/wizard?return=/numbers')}
+              >
+                Verify business
+              </Button>
+            </Card>
+          ))}
+      {provisions.map((p) => (
+        <ProvisionRow key={p.id} provision={p} />
+      ))}
+      {byo && <TwilioAccountCard companyId={company.id} />}
+      <NumbersTable
+        numbers={numbers}
+        byo={byo}
+        agent={agent}
+        onAddClick={() => (byo ? setImportOpen(true) : setAddOpen(true))}
+        onReleaseClick={(n) => setReleaseTarget(n)}
+      />
 
       {byo ? (
         <ImportNumbersModal
@@ -203,51 +235,30 @@ function AgentDetail({ agent, company }: { agent: Agent; company: Company }) {
   )
 }
 
-/* ── Agent settings ──────────────────────────────────────────────────── */
+/* ── BYO Twilio account info ──────────────────────────────────────────── */
 
-function AgentSettingsCard({ agent, byo }: { agent: Agent; byo: boolean }) {
-  const { connections } = useConnections(agent.companyId)
+function TwilioAccountCard({ companyId }: { companyId: string }) {
+  const { connections } = useConnections(companyId)
   const accountSid = connections[0]?.accountSid
   return (
-    <Card className="divide-y">
-      {byo && (
-        <div className="flex items-start gap-3 p-4">
-          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-            <Link2 className="h-4 w-4" />
+    <Card className="flex items-start gap-3 p-4">
+      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+        <Link2 className="h-4 w-4" />
+      </span>
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          Twilio account
+          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+            BYO
           </span>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 text-sm font-medium">
-              Twilio account
-              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-                BYO
-              </span>
-            </div>
-            <div className="mt-0.5 text-xs text-muted-foreground">
-              Numbers and registrations are managed in your own Twilio account.
-            </div>
-            {accountSid && (
-              <div className="mt-1 truncate font-mono text-xs text-muted-foreground">{accountSid}</div>
-            )}
-          </div>
         </div>
-      )}
-      <SettingRow
-        label="Auto-rotate"
-        hint={
-          byo
-            ? 'Unavailable for BYO numbers — replacements would be bought on your behalf.'
-            : 'Replace spam-labeled numbers automatically with healthy ones in the same region.'
-        }
-        checked={byo ? false : agent.autoRotate}
-        disabled={byo}
-        onChange={(v) => api.updateAgent(agent.id, { autoRotate: v })}
-      />
-      <SettingRow
-        label="Block incoming calls"
-        hint="Reject inbound calls on this agent's numbers."
-        checked={agent.blockIncoming}
-        onChange={(v) => api.updateAgent(agent.id, { blockIncoming: v })}
-      />
+        <div className="mt-0.5 text-xs text-muted-foreground">
+          Numbers and registrations are managed in your own Twilio account.
+        </div>
+        {accountSid && (
+          <div className="mt-1 truncate font-mono text-xs text-muted-foreground">{accountSid}</div>
+        )}
+      </div>
     </Card>
   )
 }
@@ -336,11 +347,13 @@ function ProvisionRow({ provision }: { provision: Provision }) {
 function NumbersTable({
   numbers,
   byo,
+  agent,
   onAddClick,
   onReleaseClick,
 }: {
   numbers: PhoneNumber[]
   byo: boolean
+  agent: Agent
   onAddClick: () => void
   onReleaseClick: (n: PhoneNumber) => void
 }) {
@@ -348,7 +361,10 @@ function NumbersTable({
   return (
     <Card className="overflow-hidden">
       <div className="flex items-center justify-between border-b px-5 py-4">
-        <div className="font-medium">Numbers</div>
+        <div className="flex items-center gap-3">
+          <div className="font-medium">Numbers</div>
+          <CompanySwitcher />
+        </div>
         <Button size="sm" onClick={onAddClick}>
           <Plus className="h-4 w-4" />
           {addLabel}
@@ -413,6 +429,19 @@ function NumbersTable({
           </tbody>
         </table>
       )}
+      <div className="border-t">
+        <SettingRow
+          label="Auto-rotate"
+          hint={
+            byo
+              ? 'Unavailable for BYO numbers — replacements would be bought on your behalf.'
+              : 'Replace spam-labeled numbers automatically with healthy ones in the same region.'
+          }
+          checked={byo ? false : agent.autoRotate}
+          disabled={byo}
+          onChange={(v) => api.updateAgent(agent.id, { autoRotate: v })}
+        />
+      </div>
     </Card>
   )
 }
@@ -517,16 +546,24 @@ function AddNumbersModal({
       }
 
       if (mode === 'verify') {
-        // Reserve against the existing company before routing into onboarding;
-        // in the zero state there's no company yet, so just carry the countries.
-        if (!firstRun) {
-          for (const { geo, count } of selections) {
-            await api.addNumbers(agent.id, { count, country: geo.country, region: geo.region })
-          }
+        // Reserve the picked numbers against the company, then route into
+        // onboarding. In the zero state there's no company yet, so stand one up
+        // first: US numbers are issued pre-verification and should show up right
+        // away instead of being dropped on the way into the wizard.
+        let target = agent
+        if (firstRun) {
+          const primary = countries.includes('US') ? 'US' : countries[0]
+          const created = await api.createCompany({ name: 'New company', country: primary, countries })
+          const ags = await api.listAgents(created.id)
+          target = ags[0] ?? agent
+          onCompanyCreated?.(created.id)
+        }
+        for (const { geo, count } of selections) {
+          await api.addNumbers(target.id, { count, country: geo.country, region: geo.region })
         }
         setSelections([])
         onOpenChange(false)
-        navigate(`/wizard?countries=${countries.join(',')}`)
+        navigate(`/wizard?countries=${countries.join(',')}&return=/numbers`)
         return
       }
 

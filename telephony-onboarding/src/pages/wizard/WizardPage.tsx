@@ -170,7 +170,9 @@ export function WizardPage() {
   const currentIndex = steps.indexOf(currentStep)
   const isLast = currentIndex === steps.length - 1
 
-  const done = () => navigate('/capabilities')
+  // Return to wherever the wizard was opened from (e.g. the Agents page),
+  // falling back to Telephony.
+  const done = () => navigate(searchParams.get('return') || '/capabilities')
   const onCancel = () => done()
   const onBack = () => {
     if (currentIndex > 0) setCurrentStep(steps[currentIndex - 1])
