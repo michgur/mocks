@@ -21,6 +21,7 @@ import { GeoPicker, type GeoSelection } from '@/components/GeoPicker'
 import { ImportNumbersModal } from '@/components/ImportNumbersModal'
 import { ZeroState } from '@/components/ZeroState'
 import {
+  COUNTRY_FLAGS,
   COUNTRY_LABELS,
   SUPPORTED_COUNTRIES,
   formatUsd,
@@ -198,16 +199,15 @@ function AgentDetail({ agent, company }: { agent: Agent; company: Company }) {
               </Button>
             </Card>
           ))}
-      {provisions.map((p) => (
-        <ProvisionRow key={p.id} provision={p} />
-      ))}
       {byo && <TwilioAccountCard companyId={company.id} />}
       <NumbersTable
         numbers={numbers}
+        provisions={provisions}
         byo={byo}
         agent={agent}
         onAddClick={() => (byo ? setImportOpen(true) : setAddOpen(true))}
         onReleaseClick={(n) => setReleaseTarget(n)}
+        onCancelProvision={(id) => api.cancelProvision(id)}
       />
 
       {byo ? (
@@ -297,48 +297,50 @@ function SettingRow({
 
 /* ── Provision (in-flight) row ───────────────────────────────────────── */
 
-function ProvisionRow({ provision }: { provision: Provision }) {
+function ProvisioningRow({
+  provision,
+  onCancel,
+}: {
+  provision: Provision
+  onCancel: (id: string) => void
+}) {
   const waiting = provision.status === 'waiting_on_verification'
+  const country = provision.spec.country ?? 'US'
   const total = provision.spec.count
-  const acquired = provision.acquiredNumberIds.length
-  const pct = total > 0 ? Math.round((acquired / total) * 100) : 0
-  const geo = provision.spec.region
-    ? `${provision.spec.country ?? 'US'} • ${provision.spec.region}`
-    : COUNTRY_LABELS[provision.spec.country ?? 'US']
-  const showProgress = !waiting && total > 1
+  const remaining = Math.max(1, total - provision.acquiredNumberIds.length)
+  const regionLabel = provision.spec.region
+    ? `${country} · ${provision.spec.region}`
+    : COUNTRY_LABELS[country]
 
   return (
-    <Card className="border-warning/30 bg-warning/5 px-5 py-3 text-sm">
-      <div className="flex items-start gap-3">
-        <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-warning" />
-        <div className="flex-1">
-          <div className="flex items-center justify-between gap-2">
-            <span className="font-medium">
-              Acquiring {total} {total === 1 ? 'number' : 'numbers'}
-              {geo && ` · ${geo}`}
-            </span>
-            {showProgress && (
-              <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                {acquired} of {total}
-              </span>
-            )}
-          </div>
-          <div className="mt-0.5 text-xs text-muted-foreground">
-            {waiting
-              ? 'Waiting on verification — resolves automatically once your business is verified.'
-              : 'Scanning candidates for spam reputation…'}
-          </div>
-          {showProgress && (
-            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-warning/15">
-              <div
-                className="h-full rounded-full bg-warning transition-all duration-500"
-                style={{ width: `${pct}%` }}
-              />
-            </div>
+    <tr className="border-b bg-warning/5 last:border-b-0">
+      <td className="px-5 py-3 text-muted-foreground">
+        Provisioning {remaining} {remaining === 1 ? 'number' : 'numbers'}
+      </td>
+      <td className="px-5 py-3 text-muted-foreground">
+        <span className="mr-1.5">{COUNTRY_FLAGS[country]}</span>
+        {regionLabel}
+      </td>
+      <td className="px-5 py-3">
+        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+          {waiting ? (
+            <Clock className="h-3.5 w-3.5 text-warning" />
+          ) : (
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-warning" />
           )}
-        </div>
-      </div>
-    </Card>
+          {waiting ? 'Waiting on verification' : 'Scanning…'}
+        </span>
+      </td>
+      <td className="px-5 py-3 text-muted-foreground">—</td>
+      <td className="px-5 py-3 tabular-nums text-muted-foreground">
+        {formatUsd(numberMonthlyPrice(country) * total)}/mo
+      </td>
+      <td className="px-5 py-3 text-right">
+        <Button variant="ghost" size="sm" onClick={() => onCancel(provision.id)}>
+          Cancel
+        </Button>
+      </td>
+    </tr>
   )
 }
 
@@ -346,18 +348,23 @@ function ProvisionRow({ provision }: { provision: Provision }) {
 
 function NumbersTable({
   numbers,
+  provisions,
   byo,
   agent,
   onAddClick,
   onReleaseClick,
+  onCancelProvision,
 }: {
   numbers: PhoneNumber[]
+  provisions: Provision[]
   byo: boolean
   agent: Agent
   onAddClick: () => void
   onReleaseClick: (n: PhoneNumber) => void
+  onCancelProvision: (id: string) => void
 }) {
   const addLabel = byo ? 'Import numbers' : 'Add numbers'
+  const isEmpty = numbers.length === 0 && provisions.length === 0
   return (
     <Card className="overflow-hidden">
       <div className="flex items-center justify-between border-b px-5 py-4">
@@ -370,7 +377,7 @@ function NumbersTable({
           {addLabel}
         </Button>
       </div>
-      {numbers.length === 0 ? (
+      {isEmpty ? (
         <div className="flex flex-col items-center gap-2 py-16 text-center">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
             <Phone className="h-4 w-4 text-muted-foreground" />
@@ -394,6 +401,9 @@ function NumbersTable({
             </tr>
           </thead>
           <tbody>
+            {provisions.map((p) => (
+              <ProvisioningRow key={p.id} provision={p} onCancel={onCancelProvision} />
+            ))}
             {numbers.map((n) => (
               <tr key={n.id} className="border-b last:border-b-0">
                 <td className="px-5 py-3 font-mono text-foreground">

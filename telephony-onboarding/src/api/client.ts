@@ -325,14 +325,14 @@ export const api = {
     return structuredClone(agentId ? active.filter((n) => n.agentId === agentId) : active)
   },
 
-  // Add numbers to an agent. Creates a Provision; US numbers are buyable as soon
-  // as the company exists, so they fulfill immediately even before verification.
-  // Non-US bundle countries gate provisioning on the bundle, so they wait.
+  // Add numbers to an agent. Creates a Provision; US + Canada numbers are buyable
+  // as soon as the company exists (no local-presence bundle), so they fulfill
+  // immediately even before verification. Other countries gate on the bundle.
   async addNumbers(agentId: string, spec: ProvisionSpec): Promise<Provision> {
     await delay(500)
     const agent = store.agents.find((a) => a.id === agentId)
     const verified = agent ? isCompanyVerified(agent.companyId, spec.country) : false
-    const buyable = verified || spec.country === 'US'
+    const buyable = verified || spec.country === 'US' || spec.country === 'CA'
     const provision: Provision = {
       id: uid('prov'),
       agentId,
@@ -351,6 +351,19 @@ export const api = {
     await delay()
     const open = store.provisions.filter((p) => p.status !== 'fulfilled')
     return structuredClone(agentId ? open.filter((p) => p.agentId === agentId) : open)
+  },
+
+  // Cancel an in-flight provision. Removing it from the store halts the
+  // streaming loop (it bails when the provision is gone) and drops any numbers
+  // already acquired under it.
+  async cancelProvision(id: string): Promise<void> {
+    await delay(150)
+    const idx = store.provisions.findIndex((p) => p.id === id)
+    if (idx === -1) return
+    const [p] = store.provisions.splice(idx, 1)
+    const acquired = new Set(p.acquiredNumberIds)
+    store.numbers = store.numbers.filter((n) => !acquired.has(n.id))
+    store.notify()
   },
 
   // Release a managed number. `replace` tops up an equivalent in the same geo.
@@ -512,10 +525,13 @@ function sampleNumberByCountry(country: CountryCode): string {
   switch (country) {
     case 'US':
       return `+1 (512) 555-${last}`
+    case 'CA':
+      return `+1 (416) 555-${last}`
     case 'UK':
       return `+44 20 7946 ${last}`
     case 'AU':
-      return `+61 2 8005 ${last}`
+      // AU mobile (04xx) format — what we provision in Australia.
+      return `+61 4${Math.floor(10 + Math.random() * 90)} ${Math.floor(100 + Math.random() * 900)} ${Math.floor(100 + Math.random() * 900)}`
     case 'IL':
       return `+972 3 555 ${last}`
     case 'DE':

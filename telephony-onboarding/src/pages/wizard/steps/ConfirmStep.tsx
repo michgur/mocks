@@ -2,6 +2,7 @@ import { Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   missingRequiredFields,
+  requiredBundleDocuments,
   showCnam,
   showMessaging,
   type WizardFormState,
@@ -10,6 +11,7 @@ import { BusinessInfoStep } from './BusinessInfoStep'
 import { AuthorizedRepStep } from './AuthorizedRepStep'
 import { MessagingStep } from './MessagingStep'
 import { CnamStep } from './CnamStep'
+import { DocumentsStep } from './DocumentsStep'
 
 interface Props {
   state: WizardFormState
@@ -45,6 +47,8 @@ const FIELD_META: Record<string, { label: string; anchor: string }> = {
   privacyPolicyUrl: { label: 'Privacy policy URL', anchor: 'section-messaging' },
   termsOfServiceUrl: { label: 'Terms of service URL', anchor: 'section-messaging' },
   displayName: { label: 'Caller ID name', anchor: 'section-cnam' },
+  doc_identity: { label: 'Proof of identity', anchor: 'section-documents' },
+  doc_address: { label: 'Proof of address', anchor: 'section-documents' },
 }
 
 export function ConfirmStep({
@@ -62,6 +66,8 @@ export function ConfirmStep({
   const missing = missingRequiredFields(state, { needIdentity: showIdentity })
     .map((key) => ({ key, ...FIELD_META[key] }))
     .filter((m) => m.label)
+
+  const showDocuments = showIdentity && requiredBundleDocuments(state).length > 0
 
   return (
     <div className="space-y-5">
@@ -166,6 +172,16 @@ export function ConfirmStep({
               rejectionField={cnamRejectionField}
               rejectionMessage={cnamRejectionMessage}
             />
+          </Section>
+        )}
+
+        {showDocuments && (
+          <Section
+            id="section-documents"
+            title="Supporting documents"
+            help="We can't look these up — add them to verify your business with the carrier."
+          >
+            <DocumentsStep state={state} update={update} />
           </Section>
         )}
       </div>

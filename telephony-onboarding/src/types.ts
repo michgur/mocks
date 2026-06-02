@@ -10,7 +10,7 @@
 // entity). A Company has exactly one identity. Numbers belong to an AGENT.
 // ─────────────────────────────────────────────────────────────────────────
 
-export type CountryCode = 'US' | 'UK' | 'IL' | 'AU' | 'DE' | 'FR'
+export type CountryCode = 'US' | 'CA' | 'UK' | 'IL' | 'AU' | 'DE' | 'FR'
 
 /* ── Capabilities: the user-facing channels ──────────────────────────── */
 
@@ -93,6 +93,27 @@ export interface SenderIdData {
   senderId?: string
 }
 
+/* ── Regulatory bundle supporting documents ──────────────────────────── */
+
+export type DocumentProofKind = 'identity' | 'address'
+
+// A document a bundle country requires the user to supply. Each proof has two
+// inputs: the document *kind* (which acceptable document they're providing) and
+// the file itself.
+export interface DocumentProof {
+  kind: DocumentProofKind
+  label: string
+  help: string
+  documentTypes: string[]
+}
+
+export interface BundleDocumentValue {
+  documentType?: string
+  fileName?: string
+}
+
+export type BundleDocumentsData = Partial<Record<DocumentProofKind, BundleDocumentValue>>
+
 export interface RejectionReason {
   message: string
   field?: string
@@ -114,6 +135,7 @@ export interface Requirement {
     messaging?: MessagingData
     cnam?: CnamData
     senderId?: SenderIdData
+    documents?: BundleDocumentsData
   }
   createdBy: string
   createdAt: string
@@ -294,6 +316,7 @@ export const REQUIREMENT_TWILIO_PRODUCT: Record<RequirementType, string> = {
 
 export const COUNTRY_LABELS: Record<CountryCode, string> = {
   US: 'United States',
+  CA: 'Canada',
   UK: 'United Kingdom',
   IL: 'Israel',
   AU: 'Australia',
@@ -304,6 +327,7 @@ export const COUNTRY_LABELS: Record<CountryCode, string> = {
 // Mock monthly price per number, USD — what a single local number costs/mo.
 export const NUMBER_MONTHLY_PRICE: Record<CountryCode, number> = {
   US: 1.15,
+  CA: 1.15,
   UK: 1.0,
   IL: 3.0,
   AU: 3.0,
@@ -321,6 +345,7 @@ export function formatUsd(amount: number): string {
 
 export const COUNTRY_FLAGS: Record<CountryCode, string> = {
   US: '🇺🇸',
+  CA: '🇨🇦',
   UK: '🇬🇧',
   IL: '🇮🇱',
   AU: '🇦🇺',
@@ -328,8 +353,9 @@ export const COUNTRY_FLAGS: Record<CountryCode, string> = {
   FR: '🇫🇷',
 }
 
-// Onboarding ships US + UK Companies; the rest are future.
-export const SUPPORTED_COUNTRIES: CountryCode[] = ['US', 'UK']
+// Onboarding ships US + Canada (NANP, no bundle) and UK + Australia (bundle);
+// the rest are future.
+export const SUPPORTED_COUNTRIES: CountryCode[] = ['US', 'CA', 'UK', 'AU']
 
 export const US_STATES: string[] = [
   'Any state',
@@ -345,13 +371,23 @@ export const US_STATES: string[] = [
   'Washington', 'West Virginia', 'Wisconsin', 'Wyoming',
 ]
 
+export const CA_PROVINCES: string[] = [
+  'Alberta', 'British Columbia', 'Manitoba', 'New Brunswick',
+  'Newfoundland and Labrador', 'Northwest Territories', 'Nova Scotia',
+  'Nunavut', 'Ontario', 'Prince Edward Island', 'Quebec',
+  'Saskatchewan', 'Yukon',
+]
+
 /* ── Capability ↔ requirement derivation ─────────────────────────────── */
 
 // Capabilities the user can turn on for a given Company country. Branding
 // add-ons depend on country (CNAM is US; Alphanumeric Sender ID is non-US).
 export function availableCapabilities(country: CountryCode): CapabilityKind[] {
   if (country === 'US') return ['calling', 'texting', 'branded_caller_id', 'caller_id_passthrough']
-  // Non-US (bundle countries): Alphanumeric Sender ID instead of CNAM.
+  // Canada: NANP like the US (verified calling via the CRTC), but no A2P
+  // solution yet and no CNAM — so only calling + passthrough are live.
+  if (country === 'CA') return ['calling', 'caller_id_passthrough']
+  // Other non-US (bundle countries): Alphanumeric Sender ID instead of CNAM.
   return ['calling', 'texting', 'caller_id_passthrough', 'alphanumeric_sender_id']
 }
 
@@ -403,7 +439,9 @@ export function capabilityCountries(
 // Whether a capability is live today vs. modeled-but-future for a country.
 export function isCapabilityFuture(kind: CapabilityKind, country: CountryCode): boolean {
   if (kind === 'alphanumeric_sender_id') return true // EU sender ID — future
-  if (kind === 'branded_caller_id' && country !== 'US') return true
+  // CNAM is US-only. Canada has no CNAM at all, so branded caller ID isn't even
+  // "coming soon" there; everywhere else non-US it's future.
+  if (kind === 'branded_caller_id' && country !== 'US' && country !== 'CA') return true
   return false
 }
 
@@ -414,14 +452,16 @@ export function requirementsForCapability(
   kind: CapabilityKind,
   country: CountryCode
 ): RequirementType[] {
-  if (country === 'US') {
+  // US + Canada are NANP: verified calling is its own STIR/SHAKEN registration.
+  // Canada has no A2P solution yet and no CNAM, so texting/branded carry none.
+  if (country === 'US' || country === 'CA') {
     switch (kind) {
       case 'calling':
         return ['stir_shaken']
       case 'texting':
-        return ['a2p_messaging']
+        return country === 'US' ? ['a2p_messaging'] : []
       case 'branded_caller_id':
-        return ['cnam']
+        return country === 'US' ? ['cnam'] : []
       case 'caller_id_passthrough':
         return [] // no carrier registration — just passes the number through
       case 'alphanumeric_sender_id':
@@ -444,11 +484,40 @@ export function requirementsForCapability(
 
 // The requirement that serves as a Company's identity / foundation.
 export function identityRequirementType(country: CountryCode): RequirementType {
-  return country === 'US' ? 'identity' : 'country_bundle'
+  // US + Canada provision numbers freely (no local-presence bundle), so their
+  // foundation is the verified business identity. Bundle countries use the bundle.
+  return country === 'US' || country === 'CA' ? 'identity' : 'country_bundle'
 }
 
 export function requiresBundle(country: CountryCode): boolean {
-  return country !== 'US' && country !== 'IL'
+  return country !== 'US' && country !== 'CA' && country !== 'IL'
+}
+
+// Supporting documents a country's regulatory bundle requires the user to
+// supply. Australia (mobile numbers) needs a proof of identity + proof of
+// address; the UK bundle rides on the business info alone, so it has none.
+export function bundleDocuments(country: CountryCode): DocumentProof[] {
+  if (country === 'AU') {
+    return [
+      {
+        kind: 'identity',
+        label: 'Proof of identity',
+        help: 'A document showing your business is registered.',
+        documentTypes: [
+          'ASIC company extract',
+          'Certificate of incorporation',
+          'Business registration certificate',
+        ],
+      },
+      {
+        kind: 'address',
+        label: 'Proof of address',
+        help: 'A recent document showing your business address.',
+        documentTypes: ['Utility bill', 'Tax notice', 'Rent receipt', 'Title deed', 'Commercial registry extract'],
+      },
+    ]
+  }
+  return []
 }
 
 // Roll a capability's underlying requirements (plus the foundation identity)

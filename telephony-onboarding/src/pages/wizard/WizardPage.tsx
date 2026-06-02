@@ -80,6 +80,7 @@ export function WizardPage() {
           representative: req.data.representative ?? {},
           messaging: req.data.messaging ?? {},
           cnam: req.data.cnam ?? {},
+          documents: req.data.documents ?? {},
         }
         const cfg: WizardConfig = { includeChannels: false, needIdentity: isIdentity, editing: req }
         // Editing an existing requirement: show real submitted values, not AI guesses.
@@ -324,8 +325,9 @@ function capabilitiesForRequirement(type: RequirementType): CapabilityKind[] {
 function dataForType(t: RequirementType, state: WizardFormState): Record<string, unknown> {
   switch (t) {
     case 'identity':
-    case 'country_bundle':
       return { business: state.business, representative: state.representative }
+    case 'country_bundle':
+      return { business: state.business, representative: state.representative, documents: state.documents }
     case 'a2p_messaging':
       return { messaging: state.messaging }
     case 'cnam':

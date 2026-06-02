@@ -1,11 +1,15 @@
 import {
+  bundleDocuments,
   identityRequirementType,
   requirementsForCapability,
   type AuthorizedRepData,
+  type BundleDocumentsData,
   type BusinessProfileData,
   type CapabilityKind,
   type CnamData,
   type CountryCode,
+  type DocumentProof,
+  type DocumentProofKind,
   type MessagingData,
   type RequirementType,
 } from '@/types'
@@ -25,6 +29,7 @@ export interface WizardFormState {
   representative: AuthorizedRepData
   messaging: MessagingData
   cnam: CnamData
+  documents: BundleDocumentsData
 }
 
 export const emptyWizardState: WizardFormState = {
@@ -42,6 +47,7 @@ export const emptyWizardState: WizardFormState = {
   },
   messaging: {},
   cnam: {},
+  documents: {},
 }
 
 interface VisibleStepOpts {
@@ -83,6 +89,27 @@ export function showCnam(state: WizardFormState): boolean {
   return state.capabilities.includes('branded_caller_id')
 }
 
+// The supporting documents required across the company's bundle countries
+// (deduped by kind). Drives the "Supporting documents" section on the confirm
+// page. Empty unless an in-scope country (e.g. AU) requires documents.
+export function requiredBundleDocuments(state: WizardFormState): DocumentProof[] {
+  const seen = new Set<DocumentProofKind>()
+  const out: DocumentProof[] = []
+  for (const c of state.countries) {
+    for (const d of bundleDocuments(c)) {
+      if (seen.has(d.kind)) continue
+      seen.add(d.kind)
+      out.push(d)
+    }
+  }
+  return out
+}
+
+// The field key a missing document contributes to the "needs you" callout.
+export function documentFieldKey(kind: DocumentProofKind): string {
+  return `doc_${kind}`
+}
+
 // Required fields still empty on the confirm page, as plain field keys. The
 // confirm UI maps these to labels + anchors so the "needs you" callout can link
 // straight to them (the fields AI can't fill: EIN, representative title).
@@ -97,6 +124,14 @@ export function missingRequiredFields(
   }
   if (showMessaging(state)) for (const k of MESSAGING_REQUIRED) if (!state.messaging[k]) out.push(k)
   if (showCnam(state) && !state.cnam.displayName) out.push('displayName')
+  // Bundle documents belong to the foundation, so they're gated on needIdentity.
+  // A proof is complete only when both its type and file are provided.
+  if (opts.needIdentity) {
+    for (const proof of requiredBundleDocuments(state)) {
+      const doc = state.documents[proof.kind]
+      if (!doc?.documentType || !doc?.fileName) out.push(documentFieldKey(proof.kind))
+    }
+  }
   return out
 }
 
