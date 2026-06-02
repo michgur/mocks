@@ -550,16 +550,22 @@ function AddNumbersModal({
         // onboarding. In the zero state there's no company yet, so stand one up
         // first: US numbers are issued pre-verification and should show up right
         // away instead of being dropped on the way into the wizard.
-        let target = agent
+        const provision = (agentId: string) =>
+          Promise.all(
+            selections.map(({ geo, count }) =>
+              api.addNumbers(agentId, { count, country: geo.country, region: geo.region })
+            )
+          )
+
         if (firstRun) {
           const primary = countries.includes('US') ? 'US' : countries[0]
           const created = await api.createCompany({ name: 'New company', country: primary, countries })
-          const ags = await api.listAgents(created.id)
-          target = ags[0] ?? agent
           onCompanyCreated?.(created.id)
-        }
-        for (const { geo, count } of selections) {
-          await api.addNumbers(target.id, { count, country: geo.country, region: geo.region })
+          // Provision in the background so the wizard opens immediately; the
+          // numbers stream into the list (via the store) while onboarding runs.
+          void api.listAgents(created.id).then((ags) => provision((ags[0] ?? agent).id))
+        } else {
+          void provision(agent.id)
         }
         setSelections([])
         onOpenChange(false)
