@@ -543,7 +543,7 @@ function AddNumbersModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Add numbers</DialogTitle>
           <DialogDescription>
