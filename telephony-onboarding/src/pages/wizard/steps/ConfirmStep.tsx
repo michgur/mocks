@@ -74,8 +74,8 @@ export function ConfirmStep({
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Company info</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Carriers require these details before they'll register your business for calling and
-          texting. We filled in what we could — just check it over.
+          Before carriers will connect your calls and texts, they need to verify the business
+          behind your numbers — it's what keeps your traffic from being blocked or flagged as spam.
         </p>
       </div>
 
@@ -128,7 +128,7 @@ export function ConfirmStep({
           <Section
             id="section-business"
             title="Business information"
-            help="Your registered legal entity, exactly as carriers will see it."
+            help="Enter these exactly as they appear on your official registration — carriers match them against government records, and a mismatch gets the profile rejected."
           >
             <BusinessInfoStep
               state={state}
@@ -144,7 +144,7 @@ export function ConfirmStep({
           <Section
             id="section-rep"
             title="Authorized representative"
-            help="Someone who can confirm registration details if a carrier reaches out."
+            help="The person a carrier can contact to confirm this registration. Pick someone reachable — an unanswered check can stall approval."
           >
             <AuthorizedRepStep state={state} update={update} aiActive={aiActive} />
           </Section>
@@ -154,7 +154,7 @@ export function ConfirmStep({
           <Section
             id="section-messaging"
             title="Text messaging"
-            help="Consent and policy URLs US carriers require for A2P messaging."
+            help="US carriers review your privacy policy and terms before approving texting, to confirm you handle consent and opt-outs properly."
           >
             <MessagingStep state={state} update={update} />
           </Section>
@@ -179,7 +179,7 @@ export function ConfirmStep({
           <Section
             id="section-documents"
             title="Supporting documents"
-            help="We can't look these up — add them to verify your business with the carrier."
+            help="Some countries' regulators won't issue a number without documented proof of your business. Add a file for each — we'll submit them with your registration."
           >
             <DocumentsStep state={state} update={update} />
           </Section>

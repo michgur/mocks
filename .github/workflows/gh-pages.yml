@@ -48,6 +48,11 @@ jobs:
           mkdir -p dist/crm
           cp crm-integration/index2.html  dist/crm/index.html
 
+      - name: Copy scheduler-integration into Pages root
+        run: |
+          mkdir -p dist/scheduler
+          cp scheduler-integration/index.html  dist/scheduler/index.html
+
       # Upload dist/ as a Pages artifact
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
