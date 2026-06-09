@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Harmony — Greeting step · template variables</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#ffffff; --canvas:#fafafa; --ink:#1d1d23; --ink2:#5c5c66; --muted:#9a9aa3;
+  --line:#ececef; --line2:#e2e2e6; --accent:#1a1a1f;
+  --green:#cdeeb0; --green-on:#3c7d27; --green-soft:#e9f6dc;
+  --var:#6d5ce0; --var-bg:#f0edfd; --var-line:#ddd5f8;
+  --pct:#1f8f6b; --pct-bg:#e4f6ef; --pct-line:#c5ebdd;
+  --call:#2f73d8; --call-bg:#e9f1fd; --call-line:#cfe0fa;
+}
+html,body{height:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;background:var(--bg);color:var(--ink);font-size:13px;-webkit-font-smoothing:antialiased}
+svg{display:block}
+button{font-family:inherit;cursor:pointer}
+
+.app{height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* ── Top bar ── */
+.topbar{height:64px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 18px;border-bottom:1px solid var(--line)}
+.tb-l{display:flex;align-items:center;gap:12px}
+.tb-logo{width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#3a3a44,#0c0c10);display:flex;align-items:center;justify-content:center}
+.tb-logo svg{width:18px;height:18px;color:#fff;opacity:.9}
+.tb-back{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--ink2);border:none;background:transparent}
+.tb-back:hover{background:#f4f4f6}
+.tb-crumb{font-size:16px;font-weight:600;color:var(--ink)}
+.tb-crumb .sep{color:var(--muted);font-weight:500;margin:0 4px}
+.tb-r{display:flex;align-items:center;gap:9px}
+.icon-btn{width:34px;height:34px;border-radius:9px;border:1px solid var(--line2);background:#fff;display:flex;align-items:center;justify-content:center;color:var(--ink2)}
+.icon-btn:hover{background:#f7f7f8}
+.pbtn{height:36px;padding:0 14px;border-radius:9px;display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;border:1px solid var(--line2);background:#fff;color:var(--ink)}
+.pbtn:hover{background:#f7f7f8}
+.pbtn.green{background:var(--green);border-color:transparent;color:#2b5e1c}
+.pbtn.green:hover{filter:brightness(.97)}
+.pbtn.dark{background:var(--accent);border-color:transparent;color:#fff}
+.pbtn.dark:hover{filter:brightness(1.15)}
+.pbtn svg{width:15px;height:15px}
+
+.body{flex:1;display:flex;min-height:0}
+
+/* ── Icon rail ── */
+.rail{width:56px;flex-shrink:0;border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:4px}
+.rail-i{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#a6a6ae;border:none;background:transparent}
+.rail-i:hover{background:#f4f4f6;color:var(--ink2)}
+.rail-i.on{background:var(--green-soft);color:var(--green-on)}
+.rail-i svg{width:19px;height:19px}
+.rail-div{width:22px;height:1px;background:var(--line2);margin:8px 0}
+.rail-spacer{flex:1}
+.rail-ava{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#f3b8c8,#c98bd6);overflow:hidden}
+
+/* ── Left sidebar ── */
+.side{width:230px;flex-shrink:0;border-right:1px solid var(--line);padding:14px 12px;overflow-y:auto}
+.side-sec{font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.02em;padding:14px 10px 5px}
+.side-i{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;color:var(--ink2);font-size:13px;font-weight:500;cursor:pointer}
+.side-i svg{width:17px;height:17px;flex-shrink:0;color:#9a9aa3}
+.side-i:hover{background:#f6f6f7;color:var(--ink)}
+.side-i.on{background:var(--green-soft);color:var(--green-on);font-weight:600}
+.side-i.on svg{color:var(--green-on)}
+
+/* ── Center ── */
+.center{flex:1;display:flex;flex-direction:column;min-width:0;position:relative}
+.center-hd{height:54px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 22px;border-bottom:1px solid var(--line)}
+.center-title{font-size:17px;font-weight:600}
+.viewtog{display:flex;gap:2px;background:#f4f4f6;border-radius:10px;padding:3px}
+.viewtog button{border:none;background:transparent;display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--ink2);padding:6px 12px;border-radius:8px}
+.viewtog button svg{width:14px;height:14px}
+.viewtog button.on{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.06)}
+
+.canvas{flex:1;position:relative;overflow:auto;background:
+  radial-gradient(circle at 1px 1px,#dededf 1.2px,transparent 0) 0 0/24px 24px,
+  var(--canvas)}
+.canvas-inner{min-height:100%;display:flex;align-items:center;justify-content:center;padding:40px}
+
+/* Greeting node card */
+.node{width:340px;background:#fff;border:1px solid var(--line2);border-radius:18px;box-shadow:0 6px 24px rgba(20,20,40,.07),0 1px 3px rgba(20,20,40,.05);padding:20px;cursor:pointer;transition:box-shadow .15s,border-color .15s}
+.node:hover{border-color:#d4d4da;box-shadow:0 10px 30px rgba(20,20,40,.1)}
+.node.sel{border-color:#c4b8f3;box-shadow:0 6px 24px rgba(109,92,224,.12),0 0 0 3px var(--var-bg)}
+.node-flag{width:34px;height:34px;border-radius:9px;background:#f4f4f6;display:flex;align-items:center;justify-content:center;color:#7a7a86;margin-bottom:14px}
+.node-flag svg{width:18px;height:18px}
+.node-title{font-size:18px;font-weight:600;margin-bottom:14px}
+.node hr{border:none;border-top:1px solid var(--line);margin:0 0 14px}
+.node-lbl{font-size:12px;color:var(--muted);margin-bottom:6px}
+.node-prev{border:1px solid var(--line2);border-radius:11px;padding:11px 13px;font-size:13px;color:var(--ink2);line-height:1.5;margin-bottom:14px;background:#fdfdfd}
+.node-prev:last-child{margin-bottom:0}
+
+/* Bottom floating toolbar */
+.bottombar{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:4px;background:#fff;border:1px solid var(--line2);border-radius:12px;padding:5px;box-shadow:0 4px 16px rgba(20,20,40,.1)}
+.bb-i{height:32px;padding:0 11px;border:none;background:transparent;border-radius:8px;display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:var(--ink2)}
+.bb-i:hover{background:#f4f4f6;color:var(--ink)}
+.bb-i svg{width:15px;height:15px}
+.bb-div{width:1px;height:20px;background:var(--line2);margin:0 3px}
+.bb-zoom{font-size:12.5px;font-weight:600;color:var(--ink2);min-width:42px;text-align:center}
+
+/* ── Right inspector panel ── */
+.panel{width:480px;flex-shrink:0;border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.panel-hd{height:54px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 20px;border-bottom:1px solid var(--line)}
+.panel-hd h2{font-size:18px;font-weight:600}
+.panel-hd-r{display:flex;align-items:center;gap:4px}
+.panel-body{flex:1;overflow-y:auto;padding:20px}
+.panel-foot{flex-shrink:0;border-top:1px solid var(--line);padding:13px 20px;display:flex;justify-content:flex-end}
+
+/* Ask/Say toggle */
+.asktog{display:inline-flex;gap:3px;background:#f4f4f6;border-radius:11px;padding:3px;margin-bottom:18px}
+.asktog button{border:none;background:transparent;font-size:13.5px;font-weight:600;color:var(--ink2);padding:7px 18px;border-radius:9px}
+.asktog button.on{background:var(--green);color:#2b5e1c}
+
+/* dark hint tooltip */
+.hint{background:#1c1c22;color:#e7e7ea;border-radius:13px;padding:14px 16px;display:flex;gap:11px;font-size:13px;line-height:1.5;margin-bottom:22px}
+.hint svg{width:16px;height:16px;flex-shrink:0;margin-top:1px;color:#9a9aa3}
+
+.field-lbl{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--ink2);margin-bottom:6px}
+.field-lbl svg{width:15px;height:15px;color:var(--muted)}
+.section-note{font-size:12.5px;color:var(--muted);margin-bottom:16px}
+
+.variant-name{font-size:14px;font-weight:600;margin-bottom:8px}
+.variant-name .tag{color:var(--muted);font-weight:500;margin-left:7px}
+.variant{margin-bottom:20px}
+
+.vselect{position:relative;border:1px solid var(--line2);border-radius:11px;background:#fff;margin-bottom:8px}
+.vselect select{appearance:none;border:none;background:transparent;width:100%;padding:11px 38px 11px 14px;font-size:13.5px;font-weight:600;color:var(--ink);border-radius:11px;cursor:pointer}
+.vselect select:focus{outline:none}
+.vselect .chev{position:absolute;right:13px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+.vselect .chev svg{width:15px;height:15px}
+.vselect-help{font-size:12.5px;color:var(--muted);margin-bottom:9px;padding-left:2px}
+
+/* editor (contenteditable with atomic variable chips) */
+.editor{position:relative;border:1px solid var(--line2);border-radius:13px;background:#fff;transition:border-color .15s,box-shadow .15s}
+.editor.focus{border-color:#c4b8f3;box-shadow:0 0 0 3px var(--var-bg)}
+.ed-pad{padding:13px 15px;font-size:14px;line-height:1.85;font-family:inherit;letter-spacing:0}
+.ed-input{min-height:112px;outline:none;color:var(--ink);overflow-wrap:anywhere;white-space:pre-wrap}
+.ed-input:empty::before{content:attr(data-ph);color:var(--muted)}
+
+/* atomic variable token */
+.chip{display:inline-flex;align-items:center;padding:2px 9px;border-radius:8px;font-weight:600;font-size:13px;line-height:1.35;white-space:nowrap;cursor:default;user-select:none;vertical-align:baseline}
+.chip.brace{background:var(--var-bg);color:var(--var);box-shadow:inset 0 0 0 1px var(--var-line)}
+.chip.pct{background:var(--pct-bg);color:var(--pct);box-shadow:inset 0 0 0 1px var(--pct-line)}
+.chip.call{background:var(--call-bg);color:var(--call);box-shadow:inset 0 0 0 1px var(--call-line)}
+.ed-foot{display:none;align-items:center;gap:6px;padding:8px 13px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+.editor.focus .ed-foot{display:flex}
+.ed-foot kbd{font-family:ui-monospace,monospace;background:#f4f4f6;border:1px solid var(--line2);border-bottom-width:2px;border-radius:5px;padding:1px 6px;font-size:11px;color:var(--ink2)}
+
+
+.add-word{display:inline-flex;align-items:center;gap:8px;border:1px dashed var(--line2);background:#fff;color:var(--ink2);font-size:13px;font-weight:600;padding:10px 14px;border-radius:11px;width:100%;justify-content:center}
+.add-word:hover{background:#f9f9fa;border-color:#d2d2d8}
+.add-word svg{width:15px;height:15px}
+
+.divider{border:none;border-top:1px solid var(--line);margin:24px 0}
+.collect-hd{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink2);margin-bottom:14px}
+.collect-hd svg{width:16px;height:16px;color:var(--muted)}
+.answer-lbl{font-size:13px;font-weight:600;margin-bottom:7px}
+.answer-static{border:1px solid var(--line2);border-radius:11px;background:#fafafa;padding:11px 14px;font-size:13.5px;font-weight:600;color:var(--ink)}
+.disclaimer{display:flex;align-items:center;gap:9px;margin-top:14px;padding:11px 13px;border-radius:11px;background:var(--call-bg);font-size:12.5px;color:var(--ink2);line-height:1.5}
+.disclaimer svg{width:16px;height:16px;flex-shrink:0;color:var(--call)}
+.node-creates{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.node-creates .chip{font-size:12px}
+
+/* ── Variable picker popup ── */
+.vpick{position:fixed;z-index:200;width:340px;max-height:340px;background:#fff;border:1px solid var(--line2);border-radius:13px;box-shadow:0 12px 40px rgba(20,20,40,.18);overflow:hidden;display:none;flex-direction:column}
+.vpick.open{display:flex}
+.vpick-search{padding:10px 13px;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted);display:flex;align-items:center;gap:8px}
+.vpick-search svg{width:14px;height:14px;flex-shrink:0}
+.vpick-search .q{color:var(--ink);font-weight:600}
+.vpick-search input{display:none;border:none;outline:none;background:transparent;font:inherit;font-size:13px;color:var(--ink);width:100%}
+.vpick-search input::placeholder{color:var(--muted)}
+.vpick.browse #vpick-label{display:none}
+.vpick.browse .vpick-search input{display:block}
+
+/* {} Variables header button */
+.vars-glyph{font-family:ui-monospace,SFMono-Regular,monospace;font-weight:700;color:var(--var);letter-spacing:-1px}
+.vpick-list{overflow-y:auto;padding:6px}
+.vpick-group{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;padding:8px 10px 4px}
+.vpick-item{display:flex;align-items:center;gap:11px;padding:7px 10px;border-radius:9px;cursor:pointer}
+.vpick-item:hover,.vpick-item.active{background:#f5f3fe}
+.vpick-tok{display:inline-flex;align-items:center;font-size:12.5px;font-weight:600;padding:3px 9px;border-radius:7px;flex-shrink:0}
+.vpick-tok.brace{background:var(--var-bg);color:var(--var)}
+.vpick-tok.pct{background:var(--pct-bg);color:var(--pct)}
+.vpick-tok.call{background:var(--call-bg);color:var(--call)}
+.vpick-raw{font-family:ui-monospace,SFMono-Regular,monospace;font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-left:auto;padding-left:8px}
+.vpick-empty{padding:22px;text-align:center;color:var(--muted);font-size:12.5px}
+.vpick-noresults{padding:14px 13px 8px;color:var(--muted);font-size:12.5px}
+.vpick-create{display:flex;align-items:center;gap:9px;width:calc(100% - 12px);margin:0 6px 6px;padding:9px 10px;border:1px solid var(--var-line);background:var(--var-bg);border-radius:9px;text-align:left;cursor:pointer}
+.vpick-create:hover{filter:brightness(.98)}
+.vpick-create-txt{font-size:12.5px;font-weight:600;color:var(--var)}
+.vpick-foot{border-top:1px solid var(--line);padding:7px 12px;font-size:11px;color:var(--muted);display:flex;gap:14px}
+.vpick.browse .vpick-foot span:nth-child(2){display:none}
+.vpick-foot kbd{font-family:ui-monospace,monospace;background:#f4f4f6;border:1px solid var(--line2);border-radius:4px;padding:0 5px}
+
+/* ── Launch modal ── */
+.overlay{position:fixed;inset:0;background:rgba(20,20,30,.42);backdrop-filter:blur(2px);display:none;align-items:center;justify-content:center;z-index:300}
+.overlay.open{display:flex}
+.modal{width:560px;max-width:calc(100vw - 32px);max-height:calc(100vh - 64px);background:#fff;border-radius:18px;box-shadow:0 24px 70px rgba(20,20,40,.28);display:flex;flex-direction:column;overflow:hidden}
+.modal-hd{padding:22px 24px 16px;border-bottom:1px solid var(--line)}
+.modal-icon{width:40px;height:40px;border-radius:11px;background:#fff5e8;color:#c2740c;display:flex;align-items:center;justify-content:center;margin-bottom:14px}
+.modal-icon svg{width:21px;height:21px}
+.modal-hd h3{font-size:18px;font-weight:600;margin-bottom:5px}
+.modal-hd p{font-size:13px;color:var(--ink2);line-height:1.5}
+.modal-body{padding:18px 24px;overflow-y:auto}
+.map-sub{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.map-sub-l{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.gen-btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--var-line);background:var(--var-bg);color:var(--var);font-size:12.5px;font-weight:600;padding:7px 12px;border-radius:9px;cursor:pointer}
+.gen-btn:hover{filter:brightness(.97)}
+.map-row{display:grid;grid-template-columns:1fr 22px 1fr;align-items:center;gap:10px;padding:9px 0}
+.map-row + .map-row{border-top:1px solid var(--line)}
+.map-arrow{color:var(--muted);display:flex;justify-content:center}
+.map-arrow svg{width:16px;height:16px}
+.hs-select{position:relative;border:1px solid var(--line2);border-radius:10px;background:#fff}
+.hs-select.unset{border-color:#e8c98f;background:#fffaf2}
+.hs-select.set{border-color:var(--call-line);background:var(--call-bg)}
+.hs-select select{appearance:none;border:none;background:transparent;width:100%;padding:9px 32px 9px 12px;font-size:13px;font-weight:600;color:var(--ink);border-radius:10px;cursor:pointer}
+.hs-select.unset select{color:#b07d2a}
+.hs-select select:focus{outline:none}
+.hs-select .chev{position:absolute;right:11px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+.hs-select .chev svg{width:14px;height:14px}
+.hs-head{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:9px}
+.hs-logo{width:16px;height:16px;border-radius:4px;background:#ff7a59;color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900}
+.modal-foot{padding:14px 24px;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px}
+.modal-foot-note{font-size:12px;color:#b07d2a;display:flex;align-items:center;gap:6px}
+.modal-foot-note.ok{color:var(--green-on)}
+.modal-foot-note svg{width:15px;height:15px}
+.modal-foot-r{display:flex;gap:9px}
+.pbtn:disabled{opacity:.45;cursor:not-allowed}
+
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:#e0e0e4;border-radius:5px;border:2px solid #fff}
+::-webkit-scrollbar-thumb:hover{background:#cfcfd5}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="tb-l">
+      <div class="tb-logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 12c4-7 14-7 18 0M3 12c4 7 14 7 18 0" stroke-linecap="round"/></svg></div>
+      <button class="tb-back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <div class="tb-crumb">Agents<span class="sep">/</span>Home insurance outbound</div>
+    </div>
+    <div class="tb-r">
+      <button class="pbtn" id="vars-btn"><span class="vars-glyph">{ }</span>Variables</button>
+      <button class="icon-btn" title="Version history"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 8v4l3 2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.05 11a9 9 0 1 1 .5 4M3 16v-5h5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="pbtn green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15.5 14.5l4 4M3 5h6M3 9h4M3 13h4" stroke-linecap="round"/><circle cx="11" cy="11" r="6"/></svg>Test agent</button>
+      <button class="pbtn" id="launch-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4.5 16.5L3 21l4.5-1.5M14 6l4 4M6.5 17.5C5 14 8 8 13 5c2-1.2 5-1.2 6 0s1.2 4 0 6c-3 5-9 8-12.5 6.5z" stroke-linecap="round" stroke-linejoin="round"/></svg>Launch agent</button>
+      <button class="pbtn dark">Save changes</button>
+    </div>
+  </div>
+
+  <div class="body">
+
+    <!-- Icon rail -->
+    <div class="rail">
+      <button class="rail-i" title="Home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 10l8-6 8 6v9a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z" stroke-linejoin="round"/></svg></button>
+      <button class="rail-i" title="Explore"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3l9 9-9 9-9-9z" stroke-linejoin="round"/></svg></button>
+      <button class="rail-i" title="Reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 20V10M12 20V4M19 20v-7" stroke-linecap="round"/></svg></button>
+      <div class="rail-div"></div>
+      <button class="rail-i on" title="Agents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M12 9v6M9 12h6" stroke-linecap="round"/></svg></button>
+      <button class="rail-i" title="Calls"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6.5 4h3l1.5 4-2 1.5a11 11 0 0 0 5 5l1.5-2 4 1.5v3a2 2 0 0 1-2 2A16 16 0 0 1 4.5 6a2 2 0 0 1 2-2z" stroke-linejoin="round"/></svg></button>
+      <button class="rail-i" title="Contacts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0" stroke-linecap="round"/></svg></button>
+      <div class="rail-div"></div>
+      <button class="rail-i" title="Docs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 3h7l4 4v14H7z" stroke-linejoin="round"/><path d="M14 3v4h4" stroke-linejoin="round"/></svg></button>
+      <div class="rail-spacer"></div>
+      <button class="rail-i" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.3l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2.2-1.3L14 2h-4l-.4 2.4a7 7 0 0 0-2.2 1.3l-2.3-.9-2 3.4 2 1.5a7 7 0 0 0 0 2.6l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 2.2 1.3L10 22h4l.4-2.4a7 7 0 0 0 2.2-1.3l2.3.9 2-3.4-2-1.5A7 7 0 0 0 19 12z"/></svg></button>
+      <div class="rail-ava"></div>
+    </div>
+
+    <!-- Left sidebar -->
+    <div class="side">
+      <div class="side-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Overview</div>
+      <div class="side-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0" stroke-linecap="round"/></svg>Contacts</div>
+
+      <div class="side-sec">Build</div>
+      <div class="side-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="10" cy="8" r="3.2"/><path d="M4 20a6 6 0 0 1 12 0M18 8v6M21 11h-6" stroke-linecap="round"/></svg>Persona</div>
+      <div class="side-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 10v4M9 6v12M13 8v8M17 5v14M21 10v4" stroke-linecap="round"/></svg>Voice</div>
+
+      <div class="side-sec">Train</div>
+      <div class="side-i on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="6" width="13" height="13" rx="2"/><path d="M8 3h11a2 2 0 0 1 2 2v11" stroke-linecap="round"/></svg>Script</div>
+      <div class="side-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.6 2.3c-.8.4-1.1 1-1.1 1.7M12 17h.01" stroke-linecap="round"/></svg>Custom responses</div>
+      <div class="side-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 5a2 2 0 0 1 2-2h7v18H6a2 2 0 0 1-2-2zM13 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5" stroke-linejoin="round"/></svg>Knowledge</div>
+
+      <div class="side-sec">Deploy</div>
+      <div class="side-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6.5 4h3l1.5 4-2 1.5a11 11 0 0 0 5 5l1.5-2 4 1.5v3a2 2 0 0 1-2 2A16 16 0 0 1 4.5 6a2 2 0 0 1 2-2z" stroke-linejoin="round"/></svg>Dialer</div>
+      <div class="side-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 8h14M5 12h14M5 16h14" stroke-linecap="round"/><circle cx="9" cy="8" r="1.6" fill="currentColor" stroke="none"/><circle cx="15" cy="16" r="1.6" fill="currentColor" stroke="none"/></svg>Settings</div>
+
+      <div class="side-sec">Monitor</div>
+      <div class="side-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 20V10M12 20V4M19 20v-7" stroke-linecap="round"/></svg>Analytics</div>
+      <div class="side-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9 3v6l-4 8a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-4-8V3M8 3h8M7.5 15h9" stroke-linecap="round" stroke-linejoin="round"/></svg>Experiments</div>
+      <div class="side-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6.5 4h3l1.5 4-2 1.5a11 11 0 0 0 5 5l1.5-2 4 1.5v3a2 2 0 0 1-2 2A16 16 0 0 1 4.5 6a2 2 0 0 1 2-2z" stroke-linejoin="round"/></svg>Call logs</div>
+      <div class="side-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/></svg>AI usage</div>
+    </div>
+
+    <!-- Center canvas -->
+    <div class="center">
+      <div class="center-hd">
+        <div class="center-title">Script</div>
+        <div class="viewtog">
+          <button class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6H15a3 3 0 0 1 3 3v6.5" stroke-linecap="round"/></svg>Flow</button>
+          <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="3" width="6" height="5" rx="1"/><rect x="3" y="16" width="6" height="5" rx="1"/><rect x="15" y="16" width="6" height="5" rx="1"/><path d="M12 8v4M6 16v-2h12v2" stroke-linecap="round"/></svg>Tree</button>
+          <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3" stroke-linecap="round"/></svg>Document</button>
+        </div>
+      </div>
+      <div class="canvas">
+        <div class="canvas-inner">
+          <div class="node sel">
+            <div class="node-flag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 21V4M5 4h11l-2 3 2 3H5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="node-title">Has Insurance</div>
+            <hr/>
+            <div class="node-lbl">What the agent asks</div>
+            <div class="node-prev">“Hi {contact_first_name}, it's %agent_name% calling from Bright…”</div>
+            <div class="node-creates">Creates <span class="chip call" title="{has_insurance}">Has Insurance</span></div>
+          </div>
+        </div>
+        <div class="bottombar">
+          <button class="bb-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" stroke-linecap="round"/></svg>Goals</button>
+          <div class="bb-div"></div>
+          <button class="bb-i" title="Undo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 7L4 12l5 5M4 12h11a5 5 0 0 1 0 10h-1" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button class="bb-i" title="Redo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 7l5 5-5 5M20 12H9a5 5 0 0 0 0 10h1" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <div class="bb-div"></div>
+          <button class="bb-i" title="Zoom out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14" stroke-linecap="round"/></svg></button>
+          <div class="bb-zoom">100%</div>
+          <button class="bb-i" title="Zoom in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg></button>
+          <div class="bb-div"></div>
+          <button class="bb-i" title="Search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4-4" stroke-linecap="round"/></svg></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right inspector -->
+    <div class="panel">
+      <div class="panel-hd">
+        <h2>Has Insurance</h2>
+        <div class="panel-hd-r">
+          <button class="icon-btn" style="border:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/><circle cx="19" cy="12" r="1.4" fill="currentColor"/></svg></button>
+          <button class="icon-btn" style="border:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg></button>
+        </div>
+      </div>
+
+      <div class="panel-body">
+        <div class="asktog">
+          <button class="on">Ask</button>
+          <button>Say</button>
+        </div>
+
+        <div class="hint">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01" stroke-linecap="round"/></svg>
+          <div>Give the step a goal-based name. The agent opens the call and checks whether the contact can talk.</div>
+        </div>
+
+        <div class="field-lbl">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 10h8M8 14h5M21 12a9 9 0 1 1-3.5-7.1L21 4v4h-4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          What the agent says
+        </div>
+        <div class="section-note">Add multiple versions. The agent picks the best one for the situation:</div>
+
+        <!-- Variant 1 (functional) -->
+        <div class="variant">
+          <div class="variant-name">Variant 1<span class="tag">Default</span></div>
+          <div class="vselect">
+            <select>
+              <option>Generative message</option>
+              <option>Prompt (say it word-for-word)</option>
+            </select>
+            <span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          </div>
+          <div class="vselect-help">The agent keeps your meaning but phrases it naturally.</div>
+
+          <div class="editor" id="editor">
+            <div class="ed-pad ed-input" id="ed" contenteditable="true" spellcheck="false" data-ph="Type a message… use { to insert a variable"></div>
+            <div class="ed-foot">
+              <span>Type</span><kbd>{</kbd><span>to insert a variable</span>
+            </div>
+          </div>
+        </div>
+
+        <button class="add-word"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>Add another wording</button>
+
+        <hr class="divider"/>
+
+        <div class="collect-hd">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 12l2.5 2.5L16 9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          What we collect
+        </div>
+        <div class="answer-lbl">Answer type</div>
+        <div class="answer-static">Yes / No</div>
+
+        <div class="disclaimer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01" stroke-linecap="round"/></svg>
+          <span>This goal creates a variable <span class="chip call" title="{has_insurance}">Has Insurance</span></span>
+        </div>
+      </div>
+
+      <div class="panel-foot">
+        <button class="pbtn dark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8.5 12l2.5 2.5L16 9" stroke-linecap="round" stroke-linejoin="round"/></svg>Done</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Variable picker -->
+<div class="vpick" id="vpick">
+  <div class="vpick-search">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4-4" stroke-linecap="round"/></svg>
+    <span id="vpick-label">Insert variable<span class="q" id="vpick-q"></span></span>
+    <input id="vpick-input" type="text" placeholder="Search variables…" spellcheck="false"/>
+  </div>
+  <div class="vpick-list" id="vpick-list"></div>
+  <div class="vpick-foot" id="vpick-foot"><span><kbd>↑↓</kbd> navigate</span><span><kbd>↵</kbd> insert</span><span><kbd>esc</kbd> close</span></div>
+</div>
+
+<!-- Launch modal -->
+<div class="overlay" id="launch-overlay">
+  <div class="modal">
+    <div class="modal-hd">
+      <div class="modal-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 9v4M12 17h.01M10.3 4.3 2.6 18a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 4.3a2 2 0 0 0-3.4 0z" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <h3>Map contact fields before launch</h3>
+      <p>Some contact fields aren't mapped to your CRM yet. Map them to HubSpot columns so the agent can read and write the right data during calls.</p>
+    </div>
+    <div class="modal-body">
+      <div class="map-sub">
+        <div class="map-sub-l">Unmapped contact fields</div>
+        <button class="gen-btn" id="gen-btn"><span>✨</span>Generate mappings</button>
+      </div>
+      <div class="hs-head"><span>Harmony field</span><span style="flex:1"></span><div class="hs-logo">h</div><span>HubSpot column</span></div>
+      <div id="map-rows"></div>
+    </div>
+    <div class="modal-foot">
+      <div class="modal-foot-note" id="map-note">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01" stroke-linecap="round"/></svg>
+        <span id="map-note-txt">Map all fields to continue</span>
+      </div>
+      <div class="modal-foot-r">
+        <button class="pbtn" id="launch-cancel">Cancel</button>
+        <button class="pbtn dark" id="launch-confirm" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4.5 16.5L3 21l4.5-1.5M14 6l4 4M6.5 17.5C5 14 8 8 13 5c2-1.2 5-1.2 6 0s1.2 4 0 6c-3 5-9 8-12.5 6.5z" stroke-linecap="round" stroke-linejoin="round"/></svg>Launch agent</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ───────── Variable catalog ─────────
+   Every variable is wrapped in braces. System/internal variables carry an
+   inner %…% marker, e.g. {%agent_name%}. The snake_case name is the stored
+   token; `display` is the friendly label shown in the UI. */
+const VARIABLES = [
+  {group:'Contact Fields', items:[
+    {name:'contact_first_name', kind:'contact', display:'First name'},
+    {name:'contact_last_name',  kind:'contact', display:'Last name'},
+    {name:'contact_full_name',  kind:'contact', display:'Full name'},
+    {name:'contact_email',      kind:'contact', display:'Email'},
+    {name:'contact_phone',      kind:'contact', display:'Phone'},
+    {name:'contact_company',    kind:'contact', display:'Company'},
+  ]},
+  {group:'System Fields', items:[
+    {name:'agent_name',   kind:'system', display:'Agent name'},
+    {name:'company_name', kind:'system', display:'Your company'},
+    {name:'current_date', kind:'system', display:'Current date'},
+    {name:'current_time', kind:'system', display:'Current time'},
+  ]},
+  {group:'Call Fields', items:[
+    {name:'qualify.current_insurer', kind:'call', display:'Current insurer'},
+    {name:'qualify.renewal_date',    kind:'call', display:'Renewal date'},
+    {name:'qualify.policy_type',     kind:'call', display:'Policy type'},
+    {name:'verify_identity.confirmed', kind:'call', display:'Identity confirmed'},
+  ]},
+];
+const ALL = VARIABLES.flatMap(g=>g.items);
+// stored token text — system vars get an inner %…% marker, all wrapped in {}
+const tokenText = (it)=> it.kind==='system' ? `{%${it.name}%}` : `{${it.name}}`;
+const chipClass = (it)=> it.kind==='system' ? 'pct' : it.kind==='call' ? 'call' : 'brace';
+
+// lookup table: every textual form of a token → item (for parsing seed text)
+const TOKEN_INDEX = {};
+ALL.forEach(it=>{
+  TOKEN_INDEX[tokenText(it)] = it;                           // {name} or {%name%}
+  if(it.kind==='system') TOKEN_INDEX[`%${it.name}%`] = it;   // legacy bare %name%
+});
+
+/* ───────── Elements ───────── */
+const ed     = document.getElementById('ed');
+const editor = document.getElementById('editor');
+const vpick  = document.getElementById('vpick');
+const vlist  = document.getElementById('vpick-list');
+const vq     = document.getElementById('vpick-q');
+
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+/* ───────── Chip builders ───────── */
+function chipHTML(it){
+  return `<span class="chip ${chipClass(it)}" contenteditable="false" `+
+         `data-token="${esc(tokenText(it))}" title="${esc(tokenText(it))}">${esc(it.display)}</span>`;
+}
+function elFromHTML(html){
+  const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstChild;
+}
+
+/* Render a template string into chips + text (used to seed both editors) */
+const TOKEN_RE = /\{%[a-z0-9_.]+%\}|\{[a-z0-9_.]+\}|%[a-z0-9_.]+%/gi;
+function renderTemplate(str){
+  let html='', last=0, m;
+  TOKEN_RE.lastIndex=0;
+  while((m=TOKEN_RE.exec(str))){
+    html += esc(str.slice(last, m.index));
+    const it = TOKEN_INDEX[m[0]];
+    html += it ? chipHTML(it) : esc(m[0]);
+    last = m.index + m[0].length;
+  }
+  html += esc(str.slice(last));
+  return html;
+}
+
+const SEED = "Hi {contact_first_name}, it's %agent_name% calling from Bright Car Finance. I wanted to give you a quick courtesy call regarding the finance application you made yesterday — is now a good time to chat?";
+ed.innerHTML = renderTemplate(SEED);
+
+/* ───────── Variable picker ───────── */
+let pickerOpen=false, activeIdx=0, filtered=[], trigger=null;
+let browseMode=false, pickerAnchor=null;     // browse = opened from the header "{ } Variables" button
+const vinput = document.getElementById('vpick-input');
+
+// Find an open "{" before the caret in the current text node → returns trigger info
+function findTrigger(){
+  const sel=window.getSelection();
+  if(!sel.rangeCount) return null;
+  const range=sel.getRangeAt(0);
+  if(!range.collapsed) return null;
+  const node=range.startContainer;
+  if(node.nodeType!==3 || !ed.contains(node)) return null;   // must be a text node inside the editor
+  const offset=range.startOffset;
+  const text=node.textContent.slice(0,offset);
+  const idx=text.lastIndexOf('{');
+  if(idx===-1) return null;
+  const query=text.slice(idx+1, offset);
+  if(/[\n\r{}]/.test(query)) return null;                    // query broke (newline / brace typed) — spaces are allowed (e.g. "Agent name")
+  return {node, start:idx, end:offset, query};
+}
+
+function matches(query){
+  const q=query.toLowerCase();
+  const out=[];
+  VARIABLES.forEach(g=>{
+    const hits=g.items.filter(it=>
+      it.display.toLowerCase().includes(q) ||
+      it.name.toLowerCase().includes(q));
+    if(hits.length) out.push({group:g.group, items:hits});
+  });
+  return out;
+}
+
+function renderPicker(query){
+  const groups=matches(query);
+  filtered=groups.flatMap(g=>g.items);
+  if(activeIdx>=filtered.length) activeIdx=Math.max(0,filtered.length-1);
+  vq.textContent = query ? ` · "${query}"` : '';
+
+  if(!filtered.length){
+    const q=query.trim();
+    const canCreate = q && !browseMode;       // create only makes sense when inserting into the editor
+    vlist.innerHTML=
+      `<div class="vpick-noresults">No variable named “${esc(q||'…')}”</div>`+
+      (canCreate ? `<button class="vpick-create" id="vpick-create">
+              <span class="vpick-tok brace">${esc(q)}</span>
+              <span class="vpick-create-txt">Create as a contact field</span>
+            </button>` : '');
+    const btn=document.getElementById('vpick-create');
+    if(btn) btn.addEventListener('mousedown', e=>{ e.preventDefault(); commitQuery(); });
+    return;
+  }
+  let html='', i=0;
+  groups.forEach(g=>{
+    html+=`<div class="vpick-group">${g.group}</div>`;
+    g.items.forEach(it=>{
+      const idx=i++;
+      html+=`<div class="vpick-item${idx===activeIdx?' active':''}" data-i="${idx}">
+        <span class="vpick-tok ${chipClass(it)}">${esc(it.display)}</span>
+        <span class="vpick-raw">${esc(tokenText(it))}</span>
+      </div>`;
+    });
+  });
+  vlist.innerHTML=html;
+  vlist.querySelectorAll('.vpick-item').forEach(el=>{
+    el.addEventListener('mousedown', e=>{ e.preventDefault(); choose(parseInt(el.dataset.i)); });
+    el.addEventListener('mouseenter', ()=>{ activeIdx=parseInt(el.dataset.i); paintActive(); });
+  });
+}
+function paintActive(){
+  vlist.querySelectorAll('.vpick-item').forEach(el=>
+    el.classList.toggle('active', parseInt(el.dataset.i)===activeIdx));
+  const act=vlist.querySelector('.vpick-item.active');
+  if(act) act.scrollIntoView({block:'nearest'});
+}
+
+function positionPicker(){
+  let rect=null;
+  if(pickerAnchor){                            // header-button mode: anchor below the button, right-aligned
+    const a=pickerAnchor.getBoundingClientRect();
+    rect={left:a.right-340, bottom:a.bottom, top:a.top};
+  }else if(trigger){
+    const r=document.createRange();
+    r.setStart(trigger.node, trigger.start); r.collapse(true);
+    rect=r.getBoundingClientRect();
+  }
+  if(!rect || (!rect.left && !rect.top)){
+    const s=window.getSelection();
+    if(s.rangeCount) rect=s.getRangeAt(0).getBoundingClientRect();
+  }
+  if(!rect) rect=ed.getBoundingClientRect();
+  const pw=340, ph=Math.min(340, vpick.offsetHeight||300);
+  let left=rect.left, top=rect.bottom+6;
+  if(left+pw>window.innerWidth-12) left=window.innerWidth-pw-12;
+  if(top+ph>window.innerHeight-12) top=rect.top-ph-6;
+  vpick.style.left=Math.max(12,left)+'px';
+  vpick.style.top =Math.max(12,top)+'px';
+}
+
+function refreshPicker(){
+  const t=findTrigger();
+  if(!t){ closePicker(); return; }
+  const fresh = !pickerOpen;
+  trigger=t; pickerOpen=true;
+  if(fresh) activeIdx=0;
+  vpick.classList.add('open');
+  renderPicker(t.query);
+  positionPicker();
+}
+function closePicker(){ pickerOpen=false; browseMode=false; pickerAnchor=null; trigger=null; vpick.classList.remove('open','browse'); }
+
+function choose(i){
+  const it=filtered[i];
+  if(!it) return;
+  if(browseMode) copyToken(it); else insertItem(it);
+}
+
+// Browse mode (header button): copy the token to the clipboard
+function copyToken(it){
+  const tok=tokenText(it);
+  if(navigator.clipboard) navigator.clipboard.writeText(tok).catch(()=>{});
+  closePicker();
+  flashVarsBtn(`Copied ${tok}`);
+}
+let flashTimer=null;
+function flashVarsBtn(msg){
+  const btn=document.getElementById('vars-btn');
+  if(!btn) return;
+  btn.innerHTML=`<span class="vars-glyph">✓</span>${msg}`;
+  clearTimeout(flashTimer);
+  flashTimer=setTimeout(()=>{ btn.innerHTML=`<span class="vars-glyph">{ }</span>Variables`; }, 1400);
+}
+
+// Open the picker as a global reference list, anchored to the header button
+function openBrowse(){
+  browseMode=true; pickerOpen=true; pickerAnchor=document.getElementById('vars-btn');
+  activeIdx=0;
+  vpick.classList.add('open','browse');
+  vinput.value='';
+  renderPicker('');
+  positionPicker();
+  vinput.focus();
+}
+
+// Replace the typed "{query" (or "{query}") with a variable chip
+function insertItem(it){
+  if(!it || !trigger) return;
+  const {node,start,end}=trigger;
+  const r=document.createRange();
+  r.setStart(node,start); r.setEnd(node,end);
+  r.deleteContents();
+  const chip=elFromHTML(chipHTML(it));
+  r.insertNode(chip);
+  const space=document.createTextNode(' ');
+  chip.after(space);
+  const sel=window.getSelection();
+  const after=document.createRange();
+  after.setStartAfter(space); after.collapse(true);
+  sel.removeAllRanges(); sel.addRange(after);
+  closePicker();
+  ed.focus();
+}
+
+// Create a new Contact field from free text (or reuse an exact existing match)
+function createVariable(rawName){
+  const label=(rawName||'').trim();
+  if(!label) return null;
+  const existing=ALL.find(it=>it.display.toLowerCase()===label.toLowerCase());
+  if(existing) return existing;
+  const slug=label.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+  if(!slug) return null;
+  const item={name:slug, kind:'contact', display:label};
+  VARIABLES[0].items.push(item);              // Contact Fields group
+  ALL.push(item);
+  TOKEN_INDEX[tokenText(item)]=item;
+  return item;
+}
+
+// Commit the current query as a variable — used by the "Create" button and by typing "}"
+function commitQuery(){
+  if(!trigger) return;
+  const item=createVariable(trigger.query);
+  if(item) insertItem(item); else closePicker();
+}
+
+/* ───────── Events ───────── */
+ed.addEventListener('input', refreshPicker);
+ed.addEventListener('keydown', (e)=>{
+  if(!pickerOpen) return;
+  if(e.key==='ArrowDown'){ e.preventDefault(); if(filtered.length){activeIdx=(activeIdx+1)%filtered.length; paintActive();} }
+  else if(e.key==='ArrowUp'){ e.preventDefault(); if(filtered.length){activeIdx=(activeIdx-1+filtered.length)%filtered.length; paintActive();} }
+  else if(e.key==='}'){ if(trigger && trigger.query.trim()){ e.preventDefault(); commitQuery(); } }
+  else if(e.key==='Enter'||e.key==='Tab'){
+    e.preventDefault();
+    if(filtered.length) choose(activeIdx);
+    else if(trigger && trigger.query.trim()) commitQuery();
+  }
+  else if(e.key==='Escape'){ e.preventDefault(); closePicker(); }
+});
+// caret moves (arrows/click) re-validate the trigger
+ed.addEventListener('keyup', (e)=>{
+  if(pickerOpen && ['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){
+    const t=findTrigger(); if(t){ trigger=t; renderPicker(t.query); positionPicker(); } else closePicker();
+  }
+});
+ed.addEventListener('click', ()=>{ if(pickerOpen && !findTrigger()) closePicker(); });
+ed.addEventListener('focus', ()=> editor.classList.add('focus'));
+ed.addEventListener('blur',  ()=>{ editor.classList.remove('focus'); setTimeout(()=>{ if(pickerOpen && !browseMode) closePicker(); }, 150); });
+window.addEventListener('resize', ()=>{ if(pickerOpen) positionPicker(); });
+window.addEventListener('scroll', ()=>{ if(pickerOpen) positionPicker(); }, true);
+
+/* ───────── Header "{ } Variables" button → browse picker ───────── */
+const varsBtn=document.getElementById('vars-btn');
+varsBtn.addEventListener('click', e=>{ e.stopPropagation(); if(pickerOpen&&browseMode) closePicker(); else openBrowse(); });
+vinput.addEventListener('input', ()=>{ activeIdx=0; renderPicker(vinput.value); positionPicker(); });
+vinput.addEventListener('keydown', e=>{
+  if(e.key==='ArrowDown'){ e.preventDefault(); if(filtered.length){activeIdx=(activeIdx+1)%filtered.length; paintActive();} }
+  else if(e.key==='ArrowUp'){ e.preventDefault(); if(filtered.length){activeIdx=(activeIdx-1+filtered.length)%filtered.length; paintActive();} }
+  else if(e.key==='Enter'){ e.preventDefault(); if(filtered.length) choose(activeIdx); }
+  else if(e.key==='Escape'){ e.preventDefault(); closePicker(); }
+});
+// click outside closes the browse picker (inline picker is handled by editor blur)
+document.addEventListener('mousedown', e=>{
+  if(pickerOpen && browseMode && !vpick.contains(e.target) && !varsBtn.contains(e.target)) closePicker();
+});
+
+/* ───────── Launch agent → field-mapping modal ───────── */
+const FIELDS=[
+  {display:'Vehicle Type',        hs:'Vehicle type'},
+  {display:'Registration Number', hs:'Registration plate'},
+  {display:'Warranty Expires At', hs:'Warranty expiry date'},
+];
+const HS_COLUMNS=['Vehicle make/model','Vehicle type','Registration plate','MOT due date',
+                  'Warranty expiry date','Policy renewal date','Lead source','Notes'];
+const ARROW_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14M13 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const CHEV_SVG ='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const overlay=document.getElementById('launch-overlay');
+const mapRows=document.getElementById('map-rows');
+const confirmBtn=document.getElementById('launch-confirm');
+const noteEl=document.getElementById('map-note');
+const noteTxt=document.getElementById('map-note-txt');
+
+function buildModal(){
+  mapRows.innerHTML=FIELDS.map((f,i)=>{
+    const slug=f.display.toLowerCase().replace(/[^a-z0-9]+/g,'_');
+    return `<div class="map-row">
+      <span class="chip brace" title="{${slug}}">${esc(f.display)}</span>
+      <span class="map-arrow">${ARROW_SVG}</span>
+      <div class="hs-select unset">
+        <select data-i="${i}">
+          <option value="">Select column…</option>
+          ${HS_COLUMNS.map(c=>`<option>${esc(c)}</option>`).join('')}
+        </select>
+        <span class="chev">${CHEV_SVG}</span>
+      </div>
+    </div>`;
+  }).join('');
+  mapRows.querySelectorAll('select').forEach(sel=> sel.addEventListener('change', e=>{
+    const wrap=e.target.closest('.hs-select'), set=!!e.target.value;
+    wrap.classList.toggle('set',set); wrap.classList.toggle('unset',!set);
+    updateMapState();
+  }));
+  updateMapState();
+}
+function updateMapState(){
+  const sels=[...mapRows.querySelectorAll('select')];
+  const unmapped=sels.filter(s=>!s.value).length;
+  confirmBtn.disabled=unmapped>0;
+  if(unmapped===0){ noteEl.classList.add('ok'); noteTxt.textContent='All fields mapped — ready to launch'; }
+  else { noteEl.classList.remove('ok'); noteTxt.textContent=`${unmapped} field${unmapped>1?'s':''} still need mapping`; }
+}
+function closeModal(){ overlay.classList.remove('open'); }
+
+document.getElementById('launch-btn').addEventListener('click', ()=>{ buildModal(); overlay.classList.add('open'); });
+document.getElementById('launch-cancel').addEventListener('click', closeModal);
+overlay.addEventListener('mousedown', e=>{ if(e.target===overlay) closeModal(); });
+document.getElementById('gen-btn').addEventListener('click', ()=>{
+  mapRows.querySelectorAll('select').forEach(sel=>{
+    sel.value=FIELDS[+sel.dataset.i].hs;
+    const wrap=sel.closest('.hs-select'); wrap.classList.add('set'); wrap.classList.remove('unset');
+  });
+  updateMapState();
+});
+confirmBtn.addEventListener('click', ()=>{
+  if(confirmBtn.disabled) return;
+  closeModal();
+  const lb=document.getElementById('launch-btn');
+  lb.textContent='✓ Agent launched';
+  setTimeout(()=>{ lb.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4.5 16.5L3 21l4.5-1.5M14 6l4 4M6.5 17.5C5 14 8 8 13 5c2-1.2 5-1.2 6 0s1.2 4 0 6c-3 5-9 8-12.5 6.5z" stroke-linecap="round" stroke-linejoin="round"/></svg>Launch agent'; }, 1800);
+});
+</script>
+</body>
+</html>

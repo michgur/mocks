@@ -53,6 +53,11 @@ jobs:
           mkdir -p dist/scheduler
           cp scheduler-integration/index.html  dist/scheduler/index.html
 
+      - name: Copy variables into Pages root
+        run: |
+          mkdir -p dist/variables
+          cp variables/index.html  dist/variables/index.html
+
       # Upload dist/ as a Pages artifact
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
